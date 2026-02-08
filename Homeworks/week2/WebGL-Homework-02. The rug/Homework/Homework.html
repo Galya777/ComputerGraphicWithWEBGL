@@ -1,0 +1,189 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Чергата</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec2 aXY;
+		attribute vec3 aRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			gl_Position = vec4(aXY,0,1);
+			gl_PointSize = 4.0;
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			const aXY = gl.getAttribLocation(glprog,"aXY");
+			const aRGB = gl.getAttribLocation(glprog,"aRGB");
+			const FLOAT_SIZE = 4;
+			
+			gl.clearColor(1,1,0,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// брой ленти m
+			var m = 11;
+			const data = [];
+			// от тук до края на функцията да се сложи код,
+			// който създава и рисува m цветни вълнообразни ленти
+			
+			//the following solution is made with help from StackOverflow
+const POINTS_PER_WAVE = 100;
+const map = (x, a, b) => a + (b-a) * x;
+
+const hslToRgb = (h, s, l) => {
+	if(s == 0) return [l, l, l]; 
+
+	const hue2rgb = (p, q, t) => {
+		if(t < 0) t += 1;
+		if(t > 1) t -= 1;
+		if(t < 1/6) return p + (q - p) * 6 * t;
+		if(t < 1/2) return q;
+		if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+		return p;
+	}
+
+	const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+	const p = 2 * l - q;
+	return [
+	    hue2rgb(p, q, h + 1/3) // r
+	   ,hue2rgb(p, q, h) // g
+	   ,hue2rgb(p, q, h - 1/3) // b
+	];
+}
+
+const createVWave = (xStart, amplitude, frequency) => {
+	const points = [];
+	for(let pI = 0;pI < POINTS_PER_WAVE;pI ++) {
+		const y = map(pI / (POINTS_PER_WAVE-1), 1, -1);
+		const x = xStart + Math.sin(y * frequency) * amplitude;
+		points.push(x, y);
+	}
+	return points;
+};
+
+const makeWaves = (waveCount) => {
+	const waves = [];
+
+	waves.push(createVWave(-1, 0, 0)); // right straigh line
+
+	for(let i = 0;i < waveCount;i ++) {
+		const xStart = map(i / (waveCount-1), -0.9, 0.9);
+		const amplitude = map(Math.random(), 0.05, 0.10);
+		const frequency = map(Math.random(), 1, 10);
+		waves.push(createVWave(xStart, amplitude, frequency));
+	}
+
+	waves.push(createVWave(1, 0, 0)); // right straigh line
+
+	return waves;
+};
+
+/* interlieve wave points into strips with proper LINE_STRIP order
+ * adds a border of white points after every strip
+ */
+const interlieveWaves = (wA, wB, makeBorder) => {
+	if(wA.length !== wB.length) throw "Wave lengths differ";
+	if(wA.length % 2 !== 0 || wB.length % 2 !== 0) throw "Invalid wave";
+
+	const merged = [];
+
+	// strip
+	const rgb = hslToRgb(Math.random(), 0.4, 0.5);
+	const r = Math.random(), g = Math.random(), b = Math.random();
+	for(let pIdx = 0;pIdx < wA.length / 2;pIdx ++) {
+		merged.push(wA[pIdx * 2 + 0], wA[pIdx * 2 + 1], rgb[0], rgb[1], rgb[2],
+		            wB[pIdx * 2 + 0], wB[pIdx * 2 + 1], rgb[0], rgb[1], rgb[2]
+		);
+	}
+
+	if(!makeBorder) return merged;
+
+	// white border on the left
+	const BORDER_WIDTH = 0.02;
+	for(let pIdx = 0;pIdx < wB.length / 2;pIdx ++) {
+		merged.push(wB[pIdx * 2 + 0], wB[pIdx * 2 + 1], 1.0, 1.0, 1.0,
+					wB[pIdx * 2 + 0] - BORDER_WIDTH, wB[pIdx * 2 + 1], 1.0, 1.0, 1.0
+		);
+	}
+
+	return merged;
+};
+
+const waves = makeWaves(7);
+for(let wI = 0;wI < waves.length - 1;wI ++) {
+	data.push(...interlieveWaves(waves[wI], waves[wI+1], wI !== waves.length - 2));
+}
+
+const setup = () => {
+	// ensure our program is active
+	gl.useProgram(glprog);
+
+	const buf = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+	gl.enableVertexAttribArray(aXY);
+	gl.enableVertexAttribArray(aRGB);
+	gl.vertexAttribPointer(aXY,  2, gl.FLOAT, false, 5 * FLOAT_SIZE, 0);
+	gl.vertexAttribPointer(aRGB, 3, gl.FLOAT, false, 5 * FLOAT_SIZE, 2 * FLOAT_SIZE);
+};
+
+const render = () => {
+	// clear with the color set above
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	let baseVertex = 0; // in vertices (not floats)
+	const stripsCount = waves.length - 1;
+	for (let strip = 0; strip < stripsCount; strip++) {
+		// colored band
+		gl.drawArrays(gl.TRIANGLE_STRIP, baseVertex, POINTS_PER_WAVE * 2);
+		baseVertex += POINTS_PER_WAVE * 2;
+
+		// white border for all but the last strip
+		if (strip !== stripsCount - 1) {
+			gl.drawArrays(gl.TRIANGLE_STRIP, baseVertex, POINTS_PER_WAVE * 2);
+			baseVertex += POINTS_PER_WAVE * 2;
+		}
+	}
+};
+
+// initialize and render once
+setup();
+render();
+
+}
+	
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Чергата</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>
