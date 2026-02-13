@@ -44,16 +44,54 @@
 			var data = [];
 			
 			// добавете код за създаване на буфера с върхове
-
+			
+			// Координатни оси (черни)
+			// X-ос
+			data.push(-1, 0, 0, 0, 0);
+			data.push(1, 0, 0, 0, 0);
+			// Y-ос
+			data.push(0, -1, 0, 0, 0);
+			data.push(0, 1, 0, 0, 0);
+			
+			// Брой точки за всяка вълна
+			var pointsPerWave = 50;
+			var totalPoints = n * pointsPerWave;
+			var xMin = -Math.PI;
+			var xMax = Math.PI;
+			
+			// Рисуваме областта между синус и косинус (червено)
+			// Използваме TRIANGLE_STRIP за запълване
+			for (var i = 0; i <= totalPoints; i++)
+			{
+				var t = i / totalPoints;
+				var x = xMin + (xMax - xMin) * t;
+				var sinVal = Math.sin(x);
+				var cosVal = Math.cos(x);
+				
+				// Точка от синуса
+				data.push(x, sinVal, 1, 0, 0);
+				// Точка от косинуса
+				data.push(x, cosVal, 1, 0, 0);
+			}
+			
 			var buf = gl.createBuffer();
 			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
 
 			gl.enableVertexAttribArray(aXY);
-			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,0,0);
+			gl.enableVertexAttribArray(aRGB);
+			gl.vertexAttribPointer(aXY, 2, gl.FLOAT, false, 5*FLOATS, 0);
+			gl.vertexAttribPointer(aRGB, 3, gl.FLOAT, false, 5*FLOATS, 2*FLOATS);
 			
 			// първо рисуваме черни координатни оси,
 			// а после и червена графика между синус и косинус
+			
+			// Рисуваме осите (2 точки = 1 линия)
+			gl.drawArrays(gl.LINES, 0, 4);
+			
+			// Рисуваме областта между синус и косинус (червено)
+			// Започва от 4-точка (след осите), 2*n точки за всяка вълна
+			gl.drawArrays(gl.TRIANGLE_STRIP, 4, (totalPoints + 1) * 2);
 		}
 	</script>	
 </head>

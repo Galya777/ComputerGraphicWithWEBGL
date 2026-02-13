@@ -45,6 +45,41 @@
 			
 			// изчислете тука координатите на триъгълника
 			
+			// Размер на триъгълника (ширина)
+			var R = 0.5;
+			
+			// Върхове на равностранния триъгълник (ъгли 90°, 210°, 330°)
+			var v1 = {x: 0, y: R};
+			var v2 = {x: -R*Math.sin(2*Math.PI/3), y: -R*Math.cos(2*Math.PI/3)};
+			var v3 = {x: R*Math.sin(2*Math.PI/3), y: -R*Math.cos(2*Math.PI/3)};
+			
+			// Дъга 1: център v1, от v2 до v3
+			for (var i = 0; i <= n; i++)
+			{
+				var angle = 2*Math.PI/3 + (4*Math.PI/3) * i / n; // от 120° до 480°
+				var x = v1.x + R * Math.cos(angle);
+				var y = v1.y + R * Math.sin(angle);
+				data.push(x, y, 1, 0.5, 0);
+			}
+			
+			// Дъга 2: център v2, от v3 до v1
+			for (var i = 0; i <= n; i++)
+			{
+				var angle = 0 + (4*Math.PI/3) * i / n; // от 0° до 360°
+				var x = v2.x + R * Math.cos(angle);
+				var y = v2.y + R * Math.sin(angle);
+				data.push(x, y, 1, 0.5, 0);
+			}
+			
+			// Дъга 3: център v3, от v1 до v2
+			for (var i = 0; i <= n; i++)
+			{
+				var angle = -2*Math.PI/3 + (4*Math.PI/3) * i / n; // от -120° до 240°
+				var x = v3.x + R * Math.cos(angle);
+				var y = v3.y + R * Math.sin(angle);
+				data.push(x, y, 1, 0.5, 0);
+			}
+			
 			var buf = gl.createBuffer();
 			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
@@ -52,9 +87,14 @@
 			gl.vertexAttrib3f(aRGB,1,0.5,0);
 			
 			gl.enableVertexAttribArray(aXY);
-			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,0,0);
+			gl.enableVertexAttribArray(aRGB);
+			gl.vertexAttribPointer(aXY, 2, gl.FLOAT, false, 5*FLOATS, 0);
+			gl.vertexAttribPointer(aRGB, 3, gl.FLOAT, false, 5*FLOATS, 2*FLOATS);
 			
 			// нарисувайте триъгълника
+			gl.drawArrays(gl.LINE_STRIP, 0, n+1);
+			gl.drawArrays(gl.LINE_STRIP, n+1, n+1);
+			gl.drawArrays(gl.LINE_STRIP, 2*(n+1), n+1);
 		}
 	</script>	
 </head>

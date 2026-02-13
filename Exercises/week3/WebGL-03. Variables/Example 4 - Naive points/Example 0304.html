@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Четириточие</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec2 aXY;
+		attribute vec3 aRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			gl_Position = vec4(aXY,0,1);
+			gl_PointSize = 10.0;
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			aRGB = gl.getAttribLocation(glprog,"aRGB");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// червена точка
+			gl.vertexAttrib2f(aXY,-0.2,0.3);
+			gl.vertexAttrib3f(aRGB,1,0.2,0.2);
+			gl.drawArrays(gl.POINTS,0,1);
+			
+			// зелена точка
+			gl.vertexAttrib2f(aXY,0.2,0.3);
+			gl.vertexAttrib3f(aRGB,0.2,0.9,0.2);
+			gl.drawArrays(gl.POINTS,0,1);
+			
+			// синя точка
+			gl.vertexAttrib2f(aXY,-0.2,-0.3);
+			gl.vertexAttrib3f(aRGB,0,0.5,1);
+			gl.drawArrays(gl.POINTS,0,1);
+			
+			// жълта точка
+			gl.vertexAttrib2f(aXY,0.2,-0.3);
+			gl.vertexAttrib3f(aRGB,1,0.9,0);
+			gl.drawArrays(gl.POINTS,0,1);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Четириточие</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

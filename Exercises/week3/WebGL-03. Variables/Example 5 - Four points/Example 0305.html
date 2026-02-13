@@ -1,0 +1,79 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Четириточие</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec2 aXY;
+		attribute vec3 aRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			gl_Position = vec4(aXY,0,1);
+			gl_PointSize = 10.0;
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			aRGB = gl.getAttribLocation(glprog,"aRGB");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// масив с върхове на 4 точки
+			var vData = [-0.2,0.3, 0.2,0.3, -0.2,-0.3, 0.2,-0.3];
+			// създаваме буфер
+			var vBuf = gl.createBuffer();
+			// правим го текущ буфер
+			gl.bindBuffer(gl.ARRAY_BUFFER,vBuf);
+			// свързваме го с данните от масива
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vData), gl.STATIC_DRAW);
+			// позволяваме aXY да приема множество данни
+			gl.enableVertexAttribArray(aXY);
+			// казваме как данните в буфера да се оформят при подаването
+			// им към атрибутната променлива aXY
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,0,0);
+			
+			// по аналогичен начин се процедира с цветовете на 4-те точки
+			var cData = [1,0.2,0.2, 0.2,0.9,0.2, 0,0.5,1, 1,0.9,0];
+			var cBuf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,cBuf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cData), gl.STATIC_DRAW);
+			gl.enableVertexAttribArray(aRGB);
+			gl.vertexAttribPointer(aRGB,3,gl.FLOAT,false,0,0);
+
+			gl.drawArrays(gl.POINTS,0,4);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Четириточие</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

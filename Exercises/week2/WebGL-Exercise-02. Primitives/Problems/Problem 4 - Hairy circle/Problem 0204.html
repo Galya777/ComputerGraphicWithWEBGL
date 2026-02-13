@@ -44,6 +44,48 @@
 			// добавете тука код за създаване и рисуване
 			// на окръжност с n случайни косъмчета по
 			// периферията ѝ
+			
+			var data = [];
+			var radius = 0.4;
+			
+			// рисуваме на окръжността (с точки)
+			var circlePoints = 60;
+			for (var i = 0; i < circlePoints; i++)
+			{
+				var angle = 2*Math.PI*i/circlePoints;
+				data.push(radius*Math.cos(angle), radius*Math.sin(angle), 0, 0, 0); // черни точки
+			}
+			
+			// рисуваме косъмчетата (линии)
+			for (var i = 0; i < n; i++)
+			{
+				var angle = Math.random()*2*Math.PI;
+				// начална точка на косъмчето (на окръжността)
+				var x1 = radius*Math.cos(angle);
+				var y1 = radius*Math.sin(angle);
+				// крайна точка на косъмчето (извън окръжността)
+				var hairLength = radius + random(0.1, 0.4);
+				var x2 = hairLength*Math.cos(angle);
+				var y2 = hairLength*Math.sin(angle);
+				// синьо косъмче
+				data.push(x1, y1, 0, 0, 1);
+				data.push(x2, y2, 0, 0, 1);
+			}
+			
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			
+			gl.enableVertexAttribArray(aXY);
+			gl.enableVertexAttribArray(aRGB);
+			
+			gl.vertexAttribPointer(aXY, 2, gl.FLOAT, false, 5*FLOATS, 0);
+			gl.vertexAttribPointer(aRGB, 3, gl.FLOAT, false, 5*FLOATS, 2*FLOATS);
+			
+			// рисуваме окръжността като точки
+			gl.drawArrays(gl.POINTS, 0, circlePoints);
+			// рисуваме косъмчетата като линии
+			gl.drawArrays(gl.LINES, circlePoints, n*2);
 		}
 	</script>	
 </head>

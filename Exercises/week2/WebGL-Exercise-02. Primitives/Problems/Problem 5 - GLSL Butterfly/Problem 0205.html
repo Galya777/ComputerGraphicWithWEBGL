@@ -8,14 +8,26 @@
 	
 	<script id="vshader" type="x-shader/x-vertex">
 		// допълнете променливи в шейдъра
-		attribute vec3 aRGB;
+		attribute float aIndex;
 		varying vec3 vRGB;
 		void main ()
 		{
 			// и пресмятане на координатите на точка от пеперудата
-			gl_Position = vec4(...,...,0,1);
+			float t = aIndex * 6.28318 / 250.0; // 250 = n
+			
+			// Параметрични уравнения на пеперуда
+			float x = sin(t) * (exp(cos(t)) - 2.0*cos(4.0*t) - pow(sin(t/12.0), 5.0));
+			float y = cos(t) * (exp(cos(t)) - 2.0*cos(4.0*t) - pow(sin(t/12.0), 5.0));
+			
+			// Мащабиране за по-добро показване
+			x = x * 0.12;
+			y = y * 0.12;
+			
+			gl_Position = vec4(x, y, 0, 1);
 			gl_PointSize = 4.0;
-			vRGB = aRGB;
+			
+			// Оранжево-жълт цвят за пеперудата
+			vRGB = vec3(1.0, 0.55, 0.0);
 		}
 	</script>
 	
@@ -34,7 +46,7 @@
 			gl = getContext("picasso");
 			glprog = getProgram("vshader","fshader");
 
-			aRGB = gl.getAttribLocation(glprog,"aRGB");
+			aIndex = gl.getAttribLocation(glprog,"aIndex");
 			
 			gl.clearColor(1,1,1,1);
 			gl.clear(gl.COLOR_BUFFER_BIT);
@@ -47,7 +59,8 @@
 			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
 
-			gl.vertexAttrib3f(aRGB,1,0.2,0);
+			gl.enableVertexAttribArray(aIndex);
+			gl.vertexAttribPointer(aIndex, 1, gl.FLOAT, false, 0, 0);
 
 			// създаден е буфера с n поредни числа, остава да подадете
 			// числата и броя им, за да се нарисува пеперудата

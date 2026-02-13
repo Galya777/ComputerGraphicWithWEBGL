@@ -1,0 +1,62 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Привет WebGL</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec2 aXY;
+		attribute vec3 aRGB; // цвят на точка
+		varying vec3 vRGB;	 // променлива от другия шейдър
+		void main ()
+		{
+			gl_Position = vec4(aXY,0,1);
+			gl_PointSize = 16.0;
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;	// точност на дробни числа
+		varying vec3 vRGB;			// цвят на точка (фрагмент)
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);	// сглобяваме цвета
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			// запомняне на адресите на aXY и aRGB
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			aRGB = gl.getAttribLocation(glprog,"aRGB");
+
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// записване на координатите и на цвета
+			gl.vertexAttrib2f(aXY,random(-1,1),random(-1,1));
+			gl.vertexAttrib3f(aRGB,random(0,1),random(0,1),random(0,1));
+
+			gl.drawArrays(gl.POINTS,0,1);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Привет WebGL</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

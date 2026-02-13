@@ -41,10 +41,64 @@
 
 			// брой сегменти n
 			var n = 60;
+			var data = [];
 			
 			// създаване на цветното колело
+			
+			var radius = 0.8;
+			
+			// Създаваме сегментите на колелото
+			for (var i = 0; i < n; i++)
+			{
+				var angle1 = 2 * Math.PI * i / n;
+				var angle2 = 2 * Math.PI * (i + 1) / n;
+				
+				// HSV to RGB conversion
+				var hue = i / n; // 0 to 1
+				var rgb = hsv2rgb(hue, 1, 1);
+				
+				// Център на колелото
+				data.push(0, 0, rgb[0], rgb[1], rgb[2]);
+				
+				// Върхове на сегмента
+				data.push(radius * Math.cos(angle1), radius * Math.sin(angle1), rgb[0], rgb[1], rgb[2]);
+				data.push(radius * Math.cos(angle2), radius * Math.sin(angle2), rgb[0], rgb[1], rgb[2]);
+			}
+			
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
 
+			gl.enableVertexAttribArray(aXY);
+			gl.enableVertexAttribArray(aRGB);
+			gl.vertexAttribPointer(aXY, 2, gl.FLOAT, false, 5*FLOATS, 0);
+			gl.vertexAttribPointer(aRGB, 3, gl.FLOAT, false, 5*FLOATS, 2*FLOATS);
+			
 			// рисуване на колелото
+			gl.drawArrays(gl.TRIANGLES, 0, n * 3);
+		}
+		
+		// HSV to RGB conversion function
+		function hsv2rgb(h, s, v)
+		{
+			var r, g, b;
+			var i = Math.floor(h * 6);
+			var f = h * 6 - i;
+			var p = v * (1 - s);
+			var q = v * (1 - f * s);
+			var t = v * (1 - (1 - f) * s);
+			
+			switch (i % 6)
+			{
+				case 0: r = v; g = t; b = p; break;
+				case 1: r = q; g = v; b = p; break;
+				case 2: r = p; g = v; b = t; break;
+				case 3: r = p; g = q; b = v; break;
+				case 4: r = t; g = p; b = v; break;
+				case 5: r = v; g = p; b = q; break;
+			}
+			
+			return [r, g, b];
 		}
 	</script>	
 </head>
