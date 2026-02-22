@@ -1,0 +1,119 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Множество на Манделброт</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		precision highp float;
+		uniform vec2 uCenter;
+		uniform float uScale;
+		attribute vec2 aXY;
+		varying vec2 vXY;
+		void main ()
+		{
+			gl_Position = vec4(aXY,0,1);
+			vXY = vec2(1.5,1)*(aXY*exp(-uScale)+uCenter);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision highp float;
+
+		// максимален брой итерации
+		#define MAXN 600
+		
+		// интерполирани координатите на текущия фрагмент
+		varying vec2 vXY;
+
+		// скорост на смяна на цвета
+		uniform float uLimit;
+		
+		void main( )
+		{
+			// започваме с z=0+0i и с черен цвят
+			vec2 z = vec2(0.0,0.0);
+			gl_FragColor = vec4(0,0,0,1);
+			
+			for (int i=0; i<MAXN; i++)
+			{
+				if( dot(z,z)<4.0 )
+				{
+					// ако не сме се отдалечили много
+					// пресмятаме z = z*z+aXY
+					z = vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+vXY;
+				}
+				else
+				{
+					// ако сме отвъд 2, пресмятаме цвета
+					float cr = 0.5+0.5*sin(1.0*float(i)/uLimit);
+					float cg = 0.5+0.5*sin(1.5*float(i)/uLimit);
+					float cb = 0.5+0.5*sin(2.0*float(i)/uLimit);
+					gl_FragColor = vec4(cr,cg,cb,1);
+					break;
+				};
+			}
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			uCenter = gl.getUniformLocation(glprog,"uCenter");
+			uScale = gl.getUniformLocation(glprog,"uScale");
+			uLimit = gl.getUniformLocation(glprog,"uLimit");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			var data = [1,-1,1,1,-1,-1,-1,1];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			// център и мащаб за 4 места по фрактала
+			switch (Math.round(random(1,4)))
+			{
+				case 1:	gl.uniform2fv(uCenter,[-0.5,0]);
+						gl.uniform1f(uScale,random(-0.5,0.5));
+						gl.uniform1f(uLimit,random(5,50));
+						break;
+				case 2: gl.uniform2fv(uCenter,[-0.102046,1.029853]);
+						gl.uniform1f(uScale,random(6,11));
+						gl.uniform1f(uLimit,random(5,50));
+						break;
+				case 3:	gl.uniform2fv(uCenter,[0.17,0.00057]);
+						gl.uniform1f(uScale,random(8,12));
+						gl.uniform1f(uLimit,random(5,20));
+						break;
+				case 4:	gl.uniform2fv(uCenter,[-1.01477,-0.0001]);
+						gl.uniform1f(uScale,random(6,11));
+						gl.uniform1f(uLimit,random(10,100));
+						break;
+			}
+
+			// рисуваме
+			gl.enableVertexAttribArray(aXY);
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Множество на Манделброт</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

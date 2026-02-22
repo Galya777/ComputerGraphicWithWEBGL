@@ -1,0 +1,142 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Гледна точка</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;	// гледна точка
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * uViewMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		void main( )
+		{
+			gl_FragColor = vec4(1,0,0,1);
+		}
+	</script>
+
+	<script>
+		// Единичен вектор
+		function unitVector(x)
+		{
+			var len = 1/Math.sqrt( x[0]*x[0]+x[1]*x[1]+x[2]*x[2] );
+			return [ len*x[0], len*x[1], len*x[2] ];
+		}
+		
+		// Векторно произведение на два вектора
+		function vectorProduct(x,y)
+		{
+			return [
+				x[1]*y[2]-x[2]*y[1],
+				x[2]*y[0]-x[0]*y[2],
+				x[0]*y[1]-x[1]*y[0] ];
+		}
+		
+		// Скаларно произведение на два вектора
+		function scalarProduct(x,y)
+		{
+			return x[0]*y[0] + x[1]*y[1] + x[2]*y[2];
+		}
+		
+		// Вектор между две точки
+		function vectorPoints(x,y)
+		{
+			return [ x[0]-y[0], x[1]-y[1], x[2]-y[2] ];
+		}
+		
+		// Генериране на матрица за гледна точка
+		// Параметрите се масиви с по 3 елемента
+		function viewMatrix (eye, focus, up)
+		{
+			// намиране на единичен вектор Z' по посоката на гледане
+			var z = unitVector(vectorPoints(eye,focus));
+			
+			// намиране на единичен вектор X' перпендикулярен на Z' и на посоката нагоре
+			var x = unitVector(vectorProduct(up,z));
+			
+			// намиране на единичен вектор Y' перпендикулярен на X' и Z'
+			var y = unitVector(vectorProduct(z,x));
+			
+			// резултатът е тези три вектора + транслация
+			var matrix = [
+				x[0], y[0], z[0], 0,
+				x[1], y[1], z[1], 0,
+				x[2], y[2], z[2], 0,
+				-scalarProduct(x,eye),
+				-scalarProduct(y,eye),
+				-scalarProduct(z,eye), 1 ];
+			return new Float32Array(matrix);
+		};
+		
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// перспективна проекция
+			var proj = perspMatrix(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			// гледна точка
+			var view = viewMatrix([1000,400,300], [0,0,0], [0,0,1]);
+			gl.uniformMatrix4fv(uViewMatrix,false,view);
+
+			// куб 300х300х300 центриран около (0,0,0)
+			var data = [ 150,-150,150,	// предна стена
+						 150,150,150,
+						-150,150,150,
+						-150,-150,150,
+						 150,-150,-150, // задна стена
+						 150,150,-150,
+						-150,150,-150,
+						-150,-150,-150,
+						
+						 150,-150,150, // десни хоризонтални ръбове
+						 150,-150,-150,
+						 150,150,150,
+						 150,150,-150,
+						-150,150,150,	// леви хоризонтални ръбове
+						-150,150,-150,
+						-150,-150,150,
+						-150,-150,-150	];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			// рисуваме рамките на куба
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.LINE_LOOP,0,4); // предна стена
+			gl.drawArrays(gl.LINE_LOOP,4,4); // задна стена
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.LINES,8,8); // околни ръбове между тях
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Гледна точка</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

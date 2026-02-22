@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Случайно ветрило</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec2 aXY;
+		attribute vec3 aRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			gl_Position = vec4(aXY,0,1);
+			gl_PointSize = 10.0;
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			aRGB = gl.getAttribLocation(glprog,"aRGB");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// генерираме N+1 случайни точки по начупена дъга
+			var N = 50;
+			var vData = [0,-0.9];
+			for(var i=0; i<=N; i++)
+			{
+				var r = random(0.9,1);
+				var a = Math.PI*i/N;
+				vData.push(4/6*r*Math.cos(a),r*Math.sin(a));
+			}
+
+			var vBuf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,vBuf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vData), gl.STATIC_DRAW);
+			gl.enableVertexAttribArray(aXY);
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,2*FLOATS,0*FLOATS);
+			gl.vertexAttrib3f(aRGB,0.5,0.5,1);
+			
+			// рисуваме ветрило от N триъгълника
+			gl.drawArrays(gl.TRIANGLE_FAN,0,N+2);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Случайно ветрило</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

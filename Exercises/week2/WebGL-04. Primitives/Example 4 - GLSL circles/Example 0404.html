@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>GLSL окръжности</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute float aRadius;	// радиус на окръжността
+		attribute float aIndex;		// индекс (0..59) на връх от окръжността
+		uniform float uAspect;		// аспект
+		uniform vec3 uRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			// пресмятане на ъгъла в радиани
+			float angle = radians(6.0*aIndex);
+			// пресмятане на координатите на върха
+			gl_Position = vec4(uAspect*aRadius*cos(angle),aRadius*sin(angle),0,1);
+			vRGB = uRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			// запомняне на адресите на променливите
+			aIndex = gl.getAttribLocation(glprog,"aIndex");
+			aRadius = gl.getAttribLocation(glprog,"aRadius");
+			uRGB = gl.getUniformLocation(glprog,"uRGB");
+			uAspect = gl.getUniformLocation(glprog,"uAspect");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// създаваме N точки по три окръжности
+			var N = 60;
+			var vData = [];
+			for(var i=0; i<N; i++) vData.push(i);
+			
+			// попълваме WebGL буфер с тях
+			var vBuf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,vBuf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vData), gl.STATIC_DRAW);
+			
+			gl.enableVertexAttribArray(aIndex);
+			gl.vertexAttribPointer(aIndex,1,gl.FLOAT,false,0,0);
+			
+			// даваме фиксираните стойности в uniform променливи
+			gl.uniform1f(uAspect,4.0/6.0);
+			gl.uniform3f(uRGB,1,0,0);
+
+			// рисуваме три окръжности, като всеки път сменяме радиуса
+			gl.vertexAttrib1f(aRadius,0.9);
+			gl.drawArrays(gl.LINE_LOOP,0,N);
+			gl.vertexAttrib1f(aRadius,0.7);
+			gl.drawArrays(gl.LINE_LOOP,0,N);
+			gl.vertexAttrib1f(aRadius,0.5);
+			gl.drawArrays(gl.LINE_LOOP,0,N);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>GLSL окръжности</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

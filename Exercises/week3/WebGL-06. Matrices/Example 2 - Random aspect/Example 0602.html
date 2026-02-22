@@ -1,0 +1,76 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Случаен аспект</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		void main( )
+		{
+			gl_FragColor = vec4(1,0,0,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			// създаване на случаен размер
+			gl.canvas.width = random(120,600);
+			gl.canvas.height = random(120,400);
+			var aspect = document.getElementById("aspect");
+			aspect.innerHTML = gl.canvas.width+"x"+gl.canvas.height;
+
+			// размер на рисувателната зона
+			gl.viewport(0,0,gl.canvas.width,gl.canvas.height);
+
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			var proj = orthoMatrix(gl.canvas.width,gl.canvas.height,-10,10);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			var data = [ 50,-50,0,
+						 50,50,0,
+						-50,50,0,
+						-50,-50,0 ];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			// рисуваме
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.LINE_LOOP,0,4);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Случаен аспект <span id="aspect"></span></h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+
+	<!-- нарочно създаваме малък canvas-->
+	<canvas id="picasso" width="40" height="40" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

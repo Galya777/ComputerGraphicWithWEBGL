@@ -1,0 +1,157 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Съставни матрици 1</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		uniform vec3 uColor;
+		void main( )
+		{
+			gl_FragColor = vec4(uColor,1);
+		}
+	</script>
+
+	<script>
+		var glmat;		// матрица на модела
+		var glmatnew;	// true, ако матрицата е променена, но не е подадена на шейдъра
+		
+		// зарежда единичната матрица в матрицата на модела
+		function identity()
+		{
+			glmatnew = true;
+			glmat = new Float32Array( [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1] );
+		}
+		
+		// добавя транслация към матрицата на модела
+		function translate(v)
+		{
+			glmatnew = true;
+			glmat[12] += glmat[0]*v[0]+glmat[4]*v[1]+glmat[8]*v[2];
+			glmat[13] += glmat[1]*v[0]+glmat[5]*v[1]+glmat[9]*v[2];
+			glmat[14] += glmat[2]*v[0]+glmat[6]*v[1]+glmat[10]*v[2];
+		}
+		
+		// добавя мащабиране към матрицата на модела
+		function scale(v)
+		{
+			glmatnew = true;
+			glmat[0] *= v[0];
+			glmat[1] *= v[0];
+			glmat[2] *= v[0];
+			
+			glmat[4] *= v[1];
+			glmat[5] *= v[1];
+			glmat[6] *= v[1];
+			
+			glmat[8] *= v[2];
+			glmat[9] *= v[2];
+			glmat[10] *= v[2];
+		}
+
+		function useMatrix()
+		{
+			if (glmatnew)
+			{
+				glmatnew = false;
+				gl.uniformMatrix4fv(uModelMatrix,false,glmat);
+			}
+		}
+		
+		// рисуване на куба
+		function cube()
+		{
+			useMatrix();
+			gl.drawArrays(gl.LINE_LOOP,0,4);
+			gl.drawArrays(gl.LINE_LOOP,4,4);
+			gl.drawArrays(gl.LINES,8,8);
+		}
+
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uColor = gl.getUniformLocation(glprog,"uColor");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			var proj = perspMatrix(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			var view = viewMatrix([10,5,20], [0,0,0], [0,0,1]);
+			gl.uniformMatrix4fv(uViewMatrix,false,view);
+
+			// куб 1x1x1
+			var data = [ 0.5,-0.5,0.5,	// предна стена
+						 0.5,0.5,0.5,
+						-0.5,0.5,0.5,
+						-0.5,-0.5,0.5,
+						 0.5,-0.5,-0.5, // задна стена
+						 0.5,0.5,-0.5,
+						-0.5,0.5,-0.5,
+						-0.5,-0.5,-0.5,
+						
+						 0.5,-0.5,0.5, // десни хоризонтални ръбове
+						 0.5,-0.5,-0.5,
+						 0.5,0.5,0.5,
+						 0.5,0.5,-0.5,
+						-0.5,0.5,0.5,	// леви хоризонтални ръбове
+						-0.5,0.5,-0.5,
+						-0.5,-0.5,0.5,
+						-0.5,-0.5,-0.5
+						];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+
+			// рисуване на червени кубове
+			gl.uniform3f(uColor,1,0,0);
+
+			identity();
+			scale([4,4,1]); cube();
+			scale([0.5,1,1]); translate([1.5,0,0]); cube();
+			scale([1,0.5,1]); translate([0,1.5,0]); cube();
+			scale([2,1,1]); translate([-0.75,0,0]); cube();
+			scale([0.5,1,1]); translate([-1.5,0,0]); cube();
+			scale([1,2,1]); translate([0,-0.75,0]); cube();
+			scale([1,0.5,1]); translate([0,-1.5,0]); cube();
+			scale([2,1,1]); translate([0.75,0,0]); cube();
+			scale([0.5,1,1]); translate([1.5,0,0]); cube();
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Съставни матрици 1</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

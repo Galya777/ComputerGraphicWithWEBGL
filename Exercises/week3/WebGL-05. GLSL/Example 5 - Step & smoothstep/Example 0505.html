@@ -1,0 +1,94 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Функции step() и smoothstep()</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute float aX;
+		uniform int uStep; // избор на функция
+		attribute vec2 aEdge;
+		attribute vec3 aRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			float y;
+			
+			// изчисляваме y според избраната функция
+			if (uStep==0) y = step(aEdge.x,aX);
+			if (uStep==1) y = smoothstep(aEdge.x,aEdge.y,aX);
+			if (uStep==2) y = 3.0*pow(aX+0.5,2.0)-2.0*pow(aX+0.5,3.0);
+			gl_Position = vec4(aX,y-0.5,0,1);
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aX = gl.getAttribLocation(glprog,"aX");
+			uStep = gl.getUniformLocation(glprog,"uStep");
+			aEdge = gl.getAttribLocation(glprog,"aEdge");
+			aRGB = gl.getAttribLocation(glprog,"aRGB");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// Общо n върха
+			var n = 300;
+			var data = []; // координатни оси
+			for(var i=0; i<n; i++) data.push( 2*(i)/(n-1)-1);
+
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			gl.enableVertexAttribArray(aX);
+			gl.vertexAttribPointer(aX,1,gl.FLOAT,false,0,0);
+
+			// рисуваме сива пунктирана крива за Ермитов полином
+			gl.vertexAttrib3f(aRGB,0.5,0.5,0.5);
+			gl.uniform1i(uStep,2);
+			gl.vertexAttrib2f(aEdge,-0.5,+0.5);
+			gl.drawArrays(gl.LINES,0,n);
+
+			// рисуваме червена крива за step
+			gl.vertexAttrib3f(aRGB,1,0,0);
+			gl.uniform1i(uStep,0);
+			gl.vertexAttrib1f(aEdge,0);
+			gl.drawArrays(gl.LINE_STRIP,0,n);
+
+			// рисуваме синя крива за stepsmooth
+			gl.vertexAttrib3f(aRGB,0,0,1);
+			gl.uniform1i(uStep,1);
+			gl.vertexAttrib2f(aEdge,-0.5,+0.5);
+			gl.drawArrays(gl.LINE_STRIP,0,n);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Функции step() и smoothstep()</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

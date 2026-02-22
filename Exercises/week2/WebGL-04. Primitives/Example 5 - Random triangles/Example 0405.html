@@ -1,0 +1,78 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Случайни триъгълници</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec2 aXY;
+		attribute vec3 aRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			gl_Position = vec4(aXY,0,1);
+			gl_PointSize = 10.0;
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			aRGB = gl.getAttribLocation(glprog,"aRGB");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// генерираме 3N случайни точки и цветове
+			// за всеки триъгълник ползваме един и същи
+			// цвят за трите върха
+			var N = 100;
+			var vData = [];
+			for(var i=0; i<N; i++)
+			{
+				var r = random(0,0.5);
+				var g = random(0,0.5);
+				var b = random(0.5,1);
+				for(var j=0; j<3; j++) vData.push(random(-1,1),random(-1,1),r,g,b);
+			}
+			var vBuf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,vBuf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vData), gl.STATIC_DRAW);
+			gl.enableVertexAttribArray(aXY);
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,5*FLOATS,0*FLOATS);
+			gl.enableVertexAttribArray(aRGB);
+			gl.vertexAttribPointer(aRGB,3,gl.FLOAT,false,5*FLOATS,2*FLOATS);
+			
+			// рисуваме N триъгълника
+			gl.drawArrays(gl.TRIANGLES,0,3*N);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Случайни триъгълници</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

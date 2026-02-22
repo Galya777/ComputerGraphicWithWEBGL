@@ -1,0 +1,84 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Функция clamp()</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute float aX;
+		attribute vec2 aMinMax;
+		attribute vec3 aRGB;
+		varying vec3 vRGB;
+		void main ()
+		{
+			float y = sin(aX*10.0);
+			y = clamp(y,aMinMax.x,aMinMax.y);
+			gl_Position = vec4(aX,y/1.5,0,1);
+			vRGB = aRGB;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vRGB;
+		void main( )
+		{
+			gl_FragColor = vec4(vRGB,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aX = gl.getAttribLocation(glprog,"aX");
+			aMinMax = gl.getAttribLocation(glprog,"aMinMax");
+			aRGB = gl.getAttribLocation(glprog,"aRGB");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// Общо n върха
+			var n = 500;
+			var data = []; // координатни оси
+			for(var i=0; i<n; i++) data.push( 2*(i)/(n-1)-1);
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			gl.enableVertexAttribArray(aX);
+			gl.vertexAttribPointer(aX,1,gl.FLOAT,false,0,0);
+			
+			// рисуваме сива пунктирана синусоида
+			gl.vertexAttrib3f(aRGB,0.5,0.5,0.5);
+			gl.vertexAttrib2f(aMinMax,-1,+1);
+			gl.drawArrays(gl.LINES,0,n);
+
+			// рисуваме червена синусоида подстригана под -0.3 и над 0.6
+			gl.vertexAttrib3f(aRGB,1,0,0);
+			gl.vertexAttrib2f(aMinMax,-0.3,+0.6);
+			gl.drawArrays(gl.LINE_STRIP,0,n);
+
+			// рисуваме синя синусоида подстригана над -0.6
+			gl.vertexAttrib3f(aRGB,0,0,1);
+			gl.vertexAttrib2f(aMinMax,-2,-0.6);
+			gl.drawArrays(gl.LINE_STRIP,0,n);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Функция clamp()</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

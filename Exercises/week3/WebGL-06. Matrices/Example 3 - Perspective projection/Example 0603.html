@@ -1,0 +1,96 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Перспективна проекция</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		void main( )
+		{
+			gl_FragColor = vec4(1,0,0,1);
+		}
+	</script>
+
+	<script>
+		// Генериране на перспективна матрица. Ъгълът е в градуси.
+		function perspMatrix(angle, aspect, near, far)
+		{
+			var fov = 1/Math.tan(angle/2*Math.PI/180);
+			var matrix = [
+				fov/aspect, 0, 0, 0,
+				0, fov, 0, 0,
+				0, 0, (far+near)/(near-far), -1,
+				0, 0, 2.0*near*far/(near-far), 0];
+			return new Float32Array(matrix);
+		}
+		
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// перспективна проекция
+			var proj = perspMatrix(30,gl.canvas.width/gl.canvas.height,1,4000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			// куб 300х300х300
+			var data = [ 150,-150,-700,	// предна стена
+						 150,150,-700,
+						-150,150,-700,
+						-150,-150,-700,
+						 150,-150,-1000, // задна стена
+						 150,150,-1000,
+						-150,150,-1000,
+						-150,-150,-1000,
+						
+						 150,-150,-700, // десни хоризонтални ръбове
+						 150,-150,-1000,
+						 150,150,-700,
+						 150,150,-1000,
+						-150,150,-700,	// леви хоризонтални ръбове
+						-150,150,-1000,
+						-150,-150,-700,
+						-150,-150,-1000	];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			// рисуваме рамките на куба
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.LINE_LOOP,0,4); // предна стена
+			gl.drawArrays(gl.LINE_LOOP,4,4); // задна стена
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.LINES,8,8); // околни ръбове между тях
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Перспективна проекция</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

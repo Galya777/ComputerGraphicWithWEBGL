@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Матрици</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		void main()
+		{
+			// конструиране на матрици
+			mat2 m = mat2(1,0,-1,0);
+			mat4 t;
+
+			// достъп до елементи на матрици
+			t[1] = vec4(1,2,3,4);	// попълва втора колона
+			t = mat4(1);			// инциализира диагонала
+			t[0][3] = 5.0;			// най-долна клетка на първа колона
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			var source = document.getElementById("vshader").text;
+			var shader = gl.createShader(gl.VERTEX_SHADER);
+
+			gl.shaderSource(shader,source);
+			gl.compileShader(shader);
+
+			if (gl.getShaderParameter(shader,gl.COMPILE_STATUS))
+				alert("Успешна компилация на шейдър:\r"+source);
+			else
+				alert("Грешка при компилация на шейдър: "+gl.getShaderInfoLog(shader));
+			return null;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Матрици</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

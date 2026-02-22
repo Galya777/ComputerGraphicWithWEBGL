@@ -1,0 +1,162 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Ротация около Y</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		uniform vec3 uColor;
+		void main( )
+		{
+			gl_FragColor = vec4(uColor,1);
+		}
+	</script>
+
+	<script>
+		function radians(degrees)
+		{
+			return degrees*Math.PI/180;
+		}
+		
+		// Матрица за въртене от X към Y около Z на ъгъл A
+		function zRotateMatrix(a)
+		{
+			a = radians(a);
+			var c = Math.cos(a);
+			var s = Math.sin(a);
+			var matrix = [
+				c, s, 0, 0,
+			   -s, c, 0, 0,
+				0, 0, 1, 0,
+				0, 0, 0, 1];
+			return new Float32Array(matrix);
+		}
+		
+		// Матрица за въртене от Y към Z около X на ъгъл A
+		function xRotateMatrix(a)
+		{
+			a = radians(a);
+			var c = Math.cos(a);
+			var s = Math.sin(a);
+			var matrix = [
+				1, 0, 0, 0,
+				0, c, s, 0,
+			    0,-s, c, 0,
+				0, 0, 0, 1];
+			return new Float32Array(matrix);
+		}
+		
+		// Матрица за въртене от X към Z около Y на ъгъл A
+		function yRotateMatrix(a)
+		{
+			a = radians(a);
+			var c = Math.cos(a);
+			var s = Math.sin(a);
+			var matrix = [
+				c, 0, s, 0,
+				0, 1, 0, 0,
+			   -s, 0, c, 0,
+				0, 0, 0, 1];
+			return new Float32Array(matrix);
+		}
+
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uColor = gl.getUniformLocation(glprog,"uColor");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			var proj = perspMatrix(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			var view = viewMatrix([40,15,20], [0,0,0], [0,0,1]);
+			gl.uniformMatrix4fv(uViewMatrix,false,view);
+
+			// куб 10x10x10 с център (0,0,0)
+			var data = [ 5,-5,5,	// предна стена
+						 5,5,5,
+						-5,5,5,
+						-5,-5,5,
+						 5,-5,-5, // задна стена
+						 5,5,-5,
+						-5,5,-5,
+						-5,-5,-5,
+						
+						 5,-5,5, // десни хоризонтални ръбове
+						 5,-5,-5,
+						 5,5,5,
+						 5,5,-5,
+						-5,5,5,	// леви хоризонтални ръбове
+						-5,5,-5,
+						-5,-5,5,
+						-5,-5,-5,
+
+						0, -30, 0, // ос на въртене
+						0, +20, 0
+						];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			// рисуване на оста на въртене - синя, без трансформация
+			var model = unitMatrix();
+			gl.uniformMatrix4fv(uModelMatrix,false,model);
+
+			gl.uniform3f(uColor,0,0,1);
+
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.LINES,16,2);
+			
+			// рисуване на червени кубове
+			gl.uniform3f(uColor,1,0,0);
+
+			for(var i=0; i<6; i++)
+			{
+				// матрица за завъртане на 0, 15, 30, 45, 60 или 75 градуса
+				model = yRotateMatrix(15*i);
+				gl.uniformMatrix4fv(uModelMatrix,false,model);
+
+				// рисуване на куба
+				gl.drawArrays(gl.LINE_LOOP,0,4);
+				gl.drawArrays(gl.LINE_LOOP,4,4);
+				gl.drawArrays(gl.LINES,8,8);
+			}
+				
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Ротация около Y</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

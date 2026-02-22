@@ -1,0 +1,88 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Вълна</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		// сканиране на всички пиксели по екрана
+		attribute vec2 aXY;
+		varying vec2 vXY;
+		
+		void main ()
+		{
+			// координатите си ползваме като координати
+			gl_Position = vec4(aXY,0,1);
+			
+			// подаваме координатите надолу, с оправен аспект,
+			// така те ще се интерполират за всеки фрагмент
+			vXY = vec2(1.5,1)*aXY;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+
+		// център на вълната и мащаб
+		uniform vec2 uCenter;
+		uniform float uScale;
+
+		varying vec2 vXY;
+		void main( )
+		{
+			// изчисляваме синусоида, която зависи от разстоянието
+			// между текущия фрагмент и избрания предварително център
+			float z = 0.5+0.5*sin(uScale*distance(vXY,uCenter));
+
+			// получената стойност (от 0 до 1) става цвят
+			gl_FragColor = vec4(z,z,z,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXY = gl.getAttribLocation(glprog,"aXY");
+			uCenter = gl.getUniformLocation(glprog,"uCenter");
+			uScale = gl.getUniformLocation(glprog,"uScale");
+			
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			// Фиксиран правоъгълник заемащ целия canvas
+			var data = [1,-1,1,1,-1,-1,-1,1];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			// случаен център по графичното поле
+			gl.uniform2f(uCenter,random(-1,1),random(-1,1));
+			
+			// случаен мащаб
+			gl.uniform1f(uScale,random(10,30));
+			
+			// рисуване на фиксирания правоъгълник, като
+			// шейдърът за фрагменти ще сметне точния цвят
+			gl.enableVertexAttribArray(aXY);
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Вълна</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

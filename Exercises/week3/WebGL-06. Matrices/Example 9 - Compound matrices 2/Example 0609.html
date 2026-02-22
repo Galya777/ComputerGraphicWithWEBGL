@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Съставни матрици 2</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		uniform vec3 uColor;
+		void main( )
+		{
+			gl_FragColor = vec4(uColor,1);
+		}
+	</script>
+
+	<script>
+		// добавя въртене около X към матрицата на модела
+		function xRotate(a)
+		{
+			glmatnew = true;
+			
+			a = radians(a);
+			var s = Math.sin(a);
+			var c = Math.cos(a);
+			
+			a = glmat[4]*s+glmat[8]*c;
+			glmat[4]=glmat[4]*c-glmat[8]*s;
+			glmat[8]=a;
+			
+			a = glmat[5]*s+glmat[9]*c;
+			glmat[5]=glmat[5]*c-glmat[9]*s;
+			glmat[9]=a;
+			
+			a = glmat[6]*s+glmat[10]*c;
+			glmat[6]=glmat[6]*c-glmat[10]*s;
+			glmat[10]=a;
+		}
+
+		// добавя въртене около Y към матрицата на модела
+		function yRotate(a)
+		{
+			glmatnew = true;
+
+			a = radians(a);
+			var s = Math.sin(a);
+			var c = Math.cos(a);
+			
+			a = glmat[0]*s+glmat[8]*c;
+			glmat[0]=glmat[0]*c-glmat[8]*s;
+			glmat[8]=a;
+			
+			a = glmat[1]*s+glmat[9]*c;
+			glmat[1]=glmat[1]*c-glmat[9]*s;
+			glmat[9]=a;
+			
+			a = glmat[2]*s+glmat[10]*c;
+			glmat[2]=glmat[2]*c-glmat[10]*s;
+			glmat[10]=a;
+		}
+
+		// добавя въртене около Z към матрицата на модела
+		function zRotate(a)
+		{
+			glmatnew = true;
+
+			a = radians(a);
+			var s = Math.sin(a);
+			var c = Math.cos(a);
+			
+			a = glmat[0]*s+glmat[4]*c;
+			glmat[0]=glmat[0]*c-glmat[4]*s;
+			glmat[4]=a;
+			
+			a = glmat[1]*s+glmat[5]*c;
+			glmat[1]=glmat[1]*c-glmat[5]*s;
+			glmat[5]=a;
+			
+			a = glmat[2]*s+glmat[6]*c;
+			glmat[2]=glmat[2]*c-glmat[6]*s;
+			glmat[6]=a;
+		}
+
+		// рисуване на куба
+		function cube()
+		{
+			useMatrix();
+			gl.drawArrays(gl.LINE_LOOP,0,4);
+			gl.drawArrays(gl.LINE_LOOP,4,4);
+			gl.drawArrays(gl.LINES,8,8);
+		}
+
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uColor = gl.getUniformLocation(glprog,"uColor");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			gl.clearColor(1,1,1,1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			var proj = perspMatrix(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			var view = viewMatrix([20,10,5], [0,0,0], [0,0,1]);
+			gl.uniformMatrix4fv(uViewMatrix,false,view);
+
+			// куб 1x1x1
+			var data = [ 0.5,-0.5,0.5,	// предна стена
+						 0.5,0.5,0.5,
+						-0.5,0.5,0.5,
+						-0.5,-0.5,0.5,
+						 0.5,-0.5,-0.5, // задна стена
+						 0.5,0.5,-0.5,
+						-0.5,0.5,-0.5,
+						-0.5,-0.5,-0.5,
+						
+						 0.5,-0.5,0.5, // десни хоризонтални ръбове
+						 0.5,-0.5,-0.5,
+						 0.5,0.5,0.5,
+						 0.5,0.5,-0.5,
+						-0.5,0.5,0.5,	// леви хоризонтални ръбове
+						-0.5,0.5,-0.5,
+						-0.5,-0.5,0.5,
+						-0.5,-0.5,-0.5
+						];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+
+			// рисуване на червени кубове
+			gl.uniform3f(uColor,1,0,0);
+
+			// започваме с липса на трансформация
+			identity();
+			
+			// всички размери оттук нататък са тройно по-големи
+			scale([3,3,3]);
+			
+			// първият куб е отместен наляво по Y
+			translate([0,-2,0]);
+			for( var i=0; i<360; i+=15 )
+			{
+				xRotate(15);
+				cube();
+			}
+			
+			// вторият куб е центриран по Y
+			translate([0,2,0]);
+			for( var i=0; i<360; i+=15 )
+			{
+				yRotate(15);
+				cube();
+			}
+			
+			// третият куб е надясно по Y
+			translate([0,2,0]);
+			for( var i=0; i<360; i+=15 )
+			{
+				zRotate(15);
+				cube();
+			}
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Съставни матрици 2</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>
