@@ -1,0 +1,265 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Мълнии</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders-phong.js"></script>
+	
+	<script>
+		var mat;
+		
+		function F(d)
+		{
+			mat[12] += mat[0]*d;
+			mat[13] += mat[1]*d;
+			mat[14] += mat[2]*d;
+		}
+
+		function R(a)
+		{
+			a = radians(a);
+			var s = Math.sin(a);
+			var c = Math.cos(a);
+			
+			a = mat[0]*s+mat[4]*c;
+			mat[0]=mat[0]*c-mat[4]*s;
+			mat[4]=a;
+			
+			a = mat[1]*s+mat[5]*c;
+			mat[1]=mat[1]*c-mat[5]*s;
+			mat[5]=a;
+			
+			a = mat[2]*s+mat[6]*c;
+			mat[2]=mat[2]*c-mat[6]*s;
+			mat[6]=a;
+		}
+
+		function L(a)
+		{
+			R(-a);
+		}
+
+		// мълния - конструктор
+		function lightningKoch()
+		{
+			// предварително заделяме масив (и го запазваме)
+			this.data = [];
+			for (var i=0; i<4097; i++) this.data.push(0,0,0);
+
+			// създаваме буфер с динамични данни (т.е. ще бъдат променяни)
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.data), gl.DYNAMIC_DRAW);
+			
+			this.n = this.data.length/3;
+			this.center = [0,0,0];
+			this.size = 1;
+			this.color = [0,0.5,1];
+			this.rot = 0;
+			this.dRot = 0;
+
+			// начално и крайно време на мълниите
+			this.start = now();
+			this.stop = now();
+		}
+		
+		// мълния - генератор
+		lightningKoch.prototype.generate = function()
+		{
+			var i = 3;
+			var data = this.data;
+			mat = unitMatrix();
+			
+			this.dRot = random(-10,10);
+			
+			// рекурсивно обхожда върховете на случайно ориентирана крива на Кох
+			function koch(level,len)
+			{
+				if (level)
+				{
+					// определя ъглов диапазон и избира случаен ъгъл в него
+					var limit = 30+level*(freeze?3:2);
+					var angle = random(limit/2,limit)*Math.sign(random(-1,1));
+
+					// определя случайна дължина на едната отсечка,
+					// а другата се изчислява спрямо нея и спрямо ъгъла
+					var len1 = len/random(3,6);
+					var len2 = (len-2*len1)/cos(angle*PI/180)/2;
+
+					level--;
+
+					koch(level,len1);
+					L(angle);
+					koch(level,len2);
+					R(2*angle);
+					koch(level,len2);
+					L(angle);
+					koch(level,len1);
+				}
+				else
+				{	
+					F(len);
+					data[i++] = mat[12];
+					data[i++] = mat[13];
+					data[i++] = mat[14];
+				}
+			}
+			
+			koch(6,1);
+			
+			// актуализираме буфера с новите данни
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(this.data));
+		}
+
+		// мълния - рисуване
+		lightningKoch.prototype.draw = function()
+		{
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			gl.vertexAttrib3fv(aNormal,[0,0,1]); // нулева нормала
+			translate(this.center);
+			scale([this.size,this.size,this.size]);
+			zRotate(this.rot+this.dRot); // завъртане
+			useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				gl.disableVertexAttribArray(aNormal); // без масив от нормали
+				gl.drawArrays(gl.LINE_STRIP,0,this.n);
+			popMatrix();
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShaderPhong,fShaderPhong);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0,0,0,1);
+
+			gl.uniform1i(uUseNormalMatrix,false);
+			gl.uniform3f(uAmbientColor,0.7,0.7,0.7);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uSpecularColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+			gl.uniform1f(uShininess,20);
+			
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			// голямата централна топка
+			bigBall = custom(new Sphere([0,0,0],0.3),{color:[0.3,0.35,0.4]});
+
+			// няколко по-малки топки в кръг около голямата
+			n = 5;
+			ball = [];
+			for (var i=0; i<n; i++)
+			{
+				var a =2*PI*i/n;
+				ball[i] = custom(new Sphere([1*cos(a),1*sin(a),0],0.2),{color:[0.3,0.35,0.4]});
+			}
+
+			// мълнии от голямата топка към малките
+			// и между всяка малка и следващата малка
+			light = [];
+			for (var i=0; i<n; i++)
+			{
+				var a = 360*i/n;
+				light[i] = custom(new lightningKoch(),{size:1,color:[1,1,1],rot:a});
+				light[i+n] = custom(new lightningKoch(),{size:1.2,color:[1,1,1],rot:-a+90+180/n,center:ball[i].center});
+			}
+		}
+
+		var time = now();
+		var lTime = now();
+		function now() { return (new Date()).getTime()/1000; }
+
+		var freeze = false;
+		
+		function drawFrame()
+		{
+			time = now();
+			if (!freeze) lTime=now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([0,0,4.5],[0,0,0],[cos(time/3),sin(time/3),0]);
+
+			// рисуване на голямата топка
+			bigBall.draw();
+			
+			// рисуване на малките топки
+			for (var i=0; i<n; i++)
+			{
+				ball[i].draw();
+			}
+			
+			// генериране и рисуване на мълнии
+			for (var i=0; i<2*n; i++)
+			{
+				if (freeze)
+				{
+					if (lTime>light[i].start)
+						light[i].draw()
+				}
+				else
+				{
+					// ако е настъпило времето за започване на мълния...
+					if (lTime>light[i].start)
+					{
+						if (lTime<light[i].stop)
+						{	// ... но още не ѝ е дошъл края, тогава
+							// генерирай случайна мълния и я покажи
+							light[i].generate();
+							light[i].draw();
+						}
+						else
+						{	// ... но вече ѝ е настъпил края, тогава по случаен начин
+							// определи ново начало и край в близък бъдещ момент
+							light[i].start = time+random(1,3);
+							light[i].stop  = light[i].start+random(0.2,1);
+						}
+					}
+				}
+			}
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// пускане и спиране на мълниите
+		function freezeNow()
+		{
+			freeze = !freeze;
+			document.getElementById("button").innerHTML = freeze?"Старт":"Пауза";
+			for (var i=0; i<2*n; i++)
+				light[i].generate();
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Мълнии</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button id="button" onclick="freezeNow()">Пауза</button>
+</body>

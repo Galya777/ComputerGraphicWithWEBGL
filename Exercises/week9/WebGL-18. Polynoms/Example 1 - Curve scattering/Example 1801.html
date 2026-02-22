@@ -1,0 +1,137 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Разсейване на крива</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// интерполационна крива - конструктор
+		function InterpolationCurve(pts)
+		{
+			var data = [];
+			
+			var n = pts.length;
+			function X(i) { return pts[i].center[0]; }
+			function Y(i) { return pts[i].center[1]; }
+			
+			for (var x=X(0)-1; x<=X(n-1)+1; x+=0.1)
+			{
+				var y = 0;
+				for( var i=0; i<n; i++ )
+				{
+					var p = 1;
+					for( var j=0; j<n; j++ )
+						if( j!=i )
+							p = p*(x-X(j))/(X(i)-X(j));
+					y = y+Y(i)*p;
+				}
+				data.push(x,y,0);
+			}
+			
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.n = data.length/3;
+			this.color = [1,0,0];
+		}
+		
+		// интерполационна крива - рисуване
+		InterpolationCurve.prototype.draw = function()
+		{
+			pushMatrix();
+				gl.vertexAttrib3fv(aColor,this.color);
+				gl.vertexAttrib3fv(aNormal,[0,0,1]);
+			useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.disableVertexAttribArray(aNormal);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				gl.drawArrays(gl.LINE_STRIP,0,this.n);
+			popMatrix();
+		}
+		
+		// интерполационна крива - деструктор
+		InterpolationCurve.prototype.free = function()
+		{
+			gl.deleteBuffer(this.buf);
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// създаване на контролни точки
+			n = 20;
+			pts = [];
+			for (var i=0; i<n; i++)
+				pts.push( custom(new Sphere([0,0,0],0.15),{color:[0,0.5,1]}) );
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([0,0,1.2*n],[0,0,0],[0,1,0]);
+
+			// промяна на контролните точки
+			for (var i=0; i<n; i++)
+			{
+				pts[i].center[0] = i-(n-1)/2+0.4*sin(time*(3+sin(i))+i);
+				pts[i].center[1] = 1*sin(time*(1+sin(i)/2)+(i+4)*(i-1));
+			}
+			
+			// рисуване на контролните точки
+			for (var i=0; i<n; i++)
+				pts[i].draw();
+
+			// създаване и рисуване на кривата
+			var curve = new InterpolationCurve(pts);
+			curve.draw();
+			curve.free();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Разсейване на крива</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Гладкост</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// крива на Безие - конструктор
+		function BezierCurve(pts)
+		{
+			var data = [];
+			
+			// координати на контролните точки за рисуване на контура
+			for (var i=0; i<3; i++)
+			for (var j=0; j<3; j++)
+				data.push(pts[i].center[j]);
+			
+			// използвани само за удобство и краткост
+			function X(i) { return pts[i].center[0]; }
+			function Y(i) { return pts[i].center[1]; }
+			
+			// обхождане на кривата
+			for (var t=0; t<1.02; t+=0.02)
+			{
+				var x = (1-t)*(1-t)*X(0) + 2*t*(1-t)*X(1) + t*t*X(2);
+				var y = (1-t)*(1-t)*Y(0) + 2*t*(1-t)*Y(1) + t*t*Y(2);
+				data.push(x,y,0);
+			}
+			
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.n = data.length/3;
+			this.color = [1,0,0];
+		}
+		
+		// крива на Безие - рисуване
+		BezierCurve.prototype.draw = function()
+		{
+			pushMatrix();
+				gl.vertexAttrib3fv(aNormal,[0,0,1]);
+				useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.disableVertexAttribArray(aNormal);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				
+				// рисуване на самата крива
+				gl.vertexAttrib3fv(aColor,this.color);
+				gl.drawArrays(gl.LINE_STRIP,3,this.n-3);
+				
+				// рисуване на контура
+				gl.vertexAttrib3fv(aColor,[0.6,0.6,1]);
+				gl.drawArrays(gl.LINE_STRIP,0,3);
+			popMatrix();
+		}
+		
+		// крива на Безие - деструктор
+		BezierCurve.prototype.free = function()
+		{
+			gl.deleteBuffer(this.buf);
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// създаване на контролни точки за две квадратични криви
+			pts = [];
+			for (var i=0; i<6; i++)
+				pts.push( custom(new Sphere([0,0,0],0.35),{color:[0,0.5,1],speed:random(1,1/2)*Math.sign(i%2-0.5),ofs:random(0,2*PI)}) );
+			pts[1].size = 0.25;
+			pts[4].size = 0.25;
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		var continuity = "C0";
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([0,0,30],[0,0,0],[0,1,0]);
+
+			// промяна на контролните точки
+			for (var i=0; i<6; i++)
+			{
+				var r = 8-i;
+				var a = time*pts[i].speed+pts[i].ofs;
+				pts[i].center = [r*cos(a),r*sin(a),0];
+			}
+
+			pts[2].color = (continuity)?[1,0,0]:[0,0.5,1];
+			pts[2].size = (continuity)?((sin(time)>0)?0.35*sin(time):0):0.35;
+			pts[3].color = pts[2].color;
+			pts[3].size = pts[2].size;
+			
+			// постигане на гладкост в точката на съшиване
+			if (continuity)
+				for (var j=0; j<3; j++)
+				{
+					switch (continuity)
+					{
+						case 1: // C0 и G0
+							pts[2].center[j] = (pts[2].center[j]+pts[3].center[j])/2;
+							break;
+						case 2: // G1
+							pts[2].center[j] = pts[1].center[j]*0.7+0.3*pts[4].center[j];
+							break;
+						case 3: // C1
+							pts[2].center[j] = (pts[1].center[j]+pts[4].center[j])/2;
+							break;
+					}
+					pts[3].center[j] = pts[2].center[j];
+				}
+			
+			// рисуване на контролните точки
+			for (var i=0; i<6; i++)
+				pts[i].draw();
+
+			// създаване и рисуване на кривите
+			var curve1 = new BezierCurve([pts[0],pts[1],pts[2]]);
+			var curve2 = new BezierCurve([pts[3],pts[4],pts[5]]);
+			curve1.draw();
+			curve2.draw();
+			curve1.free();
+			curve2.free();
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// промяна на гладкостта
+		function setC(c)
+		{
+			continuity = c;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Гладкост</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	Гладкост на съшиване:
+	<button onclick="setC(0)">без</button>
+	<button onclick="setC(1)">C0/G0</button>
+	<button onclick="setC(2)">G1</button>
+	<button onclick="setC(3)">C1</button>
+</body>

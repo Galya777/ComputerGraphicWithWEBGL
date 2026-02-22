@@ -1,0 +1,274 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Кубът</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		
+		uniform bool uUseAmbient;
+		uniform vec3 uAmbientColor;
+
+		uniform bool uUseDiffuse;
+		uniform vec3 uDiffuseColor;
+
+		uniform vec3 uLightDir;
+		
+		attribute vec3 aXYZ;
+		attribute vec3 aColor;
+		attribute vec3 aNormal;
+
+		varying vec3 vColor;
+		
+		void main ()
+		{
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			gl_Position = uProjectionMatrix * mvMatrix * vec4(aXYZ,1);
+			
+			// околна светлина
+			if (uUseAmbient)
+				vColor = uAmbientColor*aColor;
+			else
+				vColor = aColor;
+
+			// дифузно отражение
+			if (uUseDiffuse)
+			{
+				vec3 light = normalize(-uLightDir);
+				vec3 normal = vec3(normalize(mvMatrix*vec4(aNormal,0)));
+				vColor += aColor*uDiffuseColor*max(dot(normal,light),0.0);
+			}
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vColor;
+		
+		void main( )
+		{
+			gl_FragColor = vec4(vColor.r,vColor.g,vColor.b,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			aColor = gl.getAttribLocation(glprog,"aColor");
+			uAmbientColor = gl.getUniformLocation(glprog,"uAmbientColor");
+			uUseAmbient   = gl.getUniformLocation(glprog,"uUseAmbient");
+
+			aNormal = gl.getAttribLocation(glprog,"aNormal");
+			uDiffuseColor = gl.getUniformLocation(glprog,"uDiffuseColor");
+			uUseDiffuse = gl.getUniformLocation(glprog,"uUseDiffuse");
+			uLightDir = gl.getUniformLocation(glprog,"uLightDir");
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(2/4,2/4,2/4,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			gl.uniform3f(uAmbientColor,0.4,0.4,0.4);
+			gl.uniform1i(uUseAmbient,true);
+
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform1i(uUseDiffuse,true);
+			
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// тук да се генерира Рубиковият куб
+			createRubiksCube();
+		}
+		
+		// Глобален масив за всички кубчета
+		var cubies = [];
+		
+		// Функция за създаване на Rubik's cube (3x3x3)
+		function createRubiksCube()
+		{
+			var size = 0.9; // размер на всяко малко кубче
+			var gap = 1.0;  // разстояние между центровете
+			
+			for (var x = -1; x <= 1; x++)
+			{
+				for (var y = -1; y <= 1; y++)
+				{
+					for (var z = -1; z <= 1; z++)
+					{
+						// Определяме цветовете според позицията
+						// Всяка страна получава цвят само ако е на външната повърхност
+						var colors = [
+							(x === 1) ? [0,0,1] : [0.1,0.1,0.1],    // X+ (Blue) или тъмно
+							(x === -1) ? [0,1,0] : [0.1,0.1,0.1],   // X- (Green) или тъмно
+							(y === 1) ? [1,1,1] : [0.1,0.1,0.1],    // Y+ (White) или тъмно
+							(y === -1) ? [1,1,0] : [0.1,0.1,0.1],   // Y- (Yellow) или тъмно
+							(z === 1) ? [1,0,0] : [0.1,0.1,0.1],    // Z+ (Red) или тъмно
+							(z === -1) ? [1,0.5,0] : [0.1,0.1,0.1]  // Z- (Orange) или тъмно
+						];
+						
+						var cubie = new Cubie([x*gap, y*gap, z*gap], size, colors);
+						cubies.push(cubie);
+					}
+				}
+			}
+		}
+		
+		var frame = 0;
+	
+		// Клас за кубче с различни цветове на всяка стена
+		Cubie = function(center, size, colors)
+		{
+			this.center = center;
+			this.size = size;
+			this.colors = colors || [
+				[1,0,0], [1,0,0], [1,0,0],
+				[1,0,0], [1,0,0], [1,0,0]
+			];
+			
+			// Създаваме буфер за геометрията
+			this.createBuffer();
+		}
+		
+		// Метод за създаване на буфер със цветове
+		Cubie.prototype.createBuffer = function()
+		{
+			var size = this.size;
+			
+			// Върхове за всяка страна на куба
+			var v = [
+				// X+ (дясно) - 6 върха
+				[size/2, -size/2, size/2], [size/2, size/2, size/2], [size/2, -size/2, -size/2],
+				[size/2, size/2, size/2], [size/2, size/2, -size/2], [size/2, -size/2, -size/2],
+				// X- (ляво) - 6 върха
+				[-size/2, -size/2, size/2], [-size/2, -size/2, -size/2], [-size/2, size/2, size/2],
+				[-size/2, size/2, size/2], [-size/2, -size/2, -size/2], [-size/2, size/2, -size/2],
+				// Y+ (горе) - 6 върха
+				[-size/2, size/2, size/2], [size/2, size/2, size/2], [-size/2, size/2, -size/2],
+				[size/2, size/2, size/2], [size/2, size/2, -size/2], [-size/2, size/2, -size/2],
+				// Y- (долу) - 6 върха
+				[-size/2, -size/2, size/2], [-size/2, -size/2, -size/2], [size/2, -size/2, size/2],
+				[size/2, -size/2, size/2], [-size/2, -size/2, -size/2], [size/2, -size/2, -size/2],
+				// Z+ (пред) - 6 върха
+				[-size/2, -size/2, size/2], [size/2, -size/2, size/2], [-size/2, size/2, size/2],
+				[size/2, -size/2, size/2], [size/2, size/2, size/2], [-size/2, size/2, size/2],
+				// Z- (зад) - 6 върха
+				[-size/2, -size/2, -size/2], [-size/2, size/2, -size/2], [size/2, -size/2, -size/2],
+				[size/2, -size/2, -size/2], [-size/2, size/2, -size/2], [size/2, size/2, -size/2]
+			];
+			
+			// Нормали за всяка страна
+			var n = [
+				[1,0,0], [1,0,0], [1,0,0], [1,0,0], [1,0,0], [1,0,0],   // X+
+				[-1,0,0], [-1,0,0], [-1,0,0], [-1,0,0], [-1,0,0], [-1,0,0], // X-
+				[0,1,0], [0,1,0], [0,1,0], [0,1,0], [0,1,0], [0,1,0],   // Y+
+				[0,-1,0], [0,-1,0], [0,-1,0], [0,-1,0], [0,-1,0], [0,-1,0], // Y-
+				[0,0,1], [0,0,1], [0,0,1], [0,0,1], [0,0,1], [0,0,1],   // Z+
+				[0,0,-1], [0,0,-1], [0,0,-1], [0,0,-1], [0,0,-1], [0,0,-1]  // Z-
+			];
+			
+			// Цветове за всяка страна (6 върха x 6 страни = 36 върха)
+			var c = [];
+			for (var face = 0; face < 6; face++)
+			{
+				for (var i = 0; i < 6; i++)
+				{
+					c.push(this.colors[face]);
+				}
+			}
+			
+			// Комбинираме всички данни: позиция (3) + цвят (3) + нормала (3) = 9 floats на връх
+			var data = [];
+			for (var i = 0; i < 36; i++)
+			{
+				data.push(v[i][0], v[i][1], v[i][2]);  // позиция
+				data.push(c[i][0], c[i][1], c[i][2]);  // цвят
+				data.push(n[i][0], n[i][1], n[i][2]);  // нормала
+			}
+			
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+		}
+		
+		// Метод за рисуване на кубче
+		Cubie.prototype.draw = function()
+		{
+			pushMatrix();
+			translate(this.center);
+			useMatrix();
+			
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
+			
+			// Позиции (offset 0, 3 floats)
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ, 3, gl.FLOAT, false, 9*FLOATS, 0);
+			
+			// Цветове (offset 3, 3 floats)
+			gl.enableVertexAttribArray(aColor);
+			gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, 9*FLOATS, 3*FLOATS);
+			
+			// Нормали (offset 6, 3 floats)
+			gl.enableVertexAttribArray(aNormal);
+			gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 9*FLOATS, 6*FLOATS);
+			
+			// Рисуваме 36 върха (6 страни x 2 триъгълника x 3 върха)
+			gl.drawArrays(gl.TRIANGLES, 0, 36);
+			
+			popMatrix();
+		}
+		
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([10*Math.cos(frame/100),10*Math.sin(frame/100),0], [0,0,0], [0,-1,1]);
+			yRotate(0.1);
+
+			// Рисуване на всички 27 кубчета
+			for (var i = 0; i < cubies.length; i++)
+			{
+				cubies[i].draw();
+			}
+
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Кубът</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

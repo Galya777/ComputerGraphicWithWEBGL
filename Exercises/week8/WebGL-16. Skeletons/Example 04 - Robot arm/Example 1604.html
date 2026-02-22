@@ -1,0 +1,129 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Ръка на робот</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// става и кост - конструктор
+		Bone = function(size)
+		{	
+			this.bone = new Cuboid([0,0,0],size);
+			this.bone.color = [0.5,0.8,0.5];
+			this.bone.offset = [0,0,0.5];
+			this.rot = [0,0,0];
+		}
+
+		// става и кост - метод за рисуване
+		Bone.prototype.draw = function()
+		{	
+			if (this.rot)
+			{
+				if (this.rot[0]) zRotate(this.rot[0]);	// хоризонтален ъгъл
+				if (this.rot[1]) xRotate(this.rot[1]);	// вертикален ъгъл
+				if (this.rot[2]) zRotate(this.rot[2]);	// осев ъгъл
+			}
+			this.bone.draw();
+			translate([0,0,this.bone.size[2]]); // преместване в края на костта
+		}
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.7,0.7,0.7,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// платформа
+			platform = new Prism([0,0,-1],15,1,8);
+			
+			// дефиниране на роботска ръка от две кости
+			bone1 = new Bone( [3,1,9] );
+			bone2 = new Bone( [2,1,7] );
+		}
+
+		var frame = 0;
+		
+		var time = now();
+		var oldTime = time;
+		function now() { return (new Date()).getTime()/1000; }
+		
+		var dir = -1;
+		var alpha = [0,0,0];
+		
+		function drawFrame()
+		{
+			time = now();
+			var dTime = time-oldTime;
+			oldTime = time;
+			
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([50*cos(time/5),50*sin(time/5),15],[0,0,6],[0,0,1]);
+
+			// рисуване на платформата
+			platform.draw();
+			
+			// движение и рисуване на роботската ръка
+			pushMatrix();
+				// променяме един от ъглите в ставата
+				if (dir>=0)
+				{
+					alpha[dir] += dTime;
+					bone2.rot[dir] = 90*sin(alpha[dir]);
+				}
+				// рисуване на двете кости
+				bone1.draw();
+				bone2.draw();
+			popMatrix();
+
+			requestAnimationFrame(drawFrame);
+		}
+		
+		function setDir(i)
+		{
+			dir = i;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Ръка на робот</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="setDir(-1)">Стоп</button>
+	<button onclick="setDir(0)">Хоризонтално</button>
+	<button onclick="setDir(1)">Вертикално</button>
+	<button onclick="setDir(2)">Осево</button>
+</body>

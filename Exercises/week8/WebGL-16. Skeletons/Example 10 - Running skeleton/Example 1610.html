@@ -1,0 +1,96 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Бягащ скелет</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	<script src="skeleton.js"></script>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.85,0.85,0.85,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// дефиниране на скелет
+			body = new Skeleton();
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([8*cos(time/5),8*sin(time/5),1],[0,0,0],[0,0,1]);
+
+			// поза
+			var t = 3*time;
+			var q = t+PI;
+
+			// крака
+			body.legL1.rot = [0,-5,-10+35*sin(t),0]; // ляв крак
+			body.legR1.rot = [0,5,-10+35*sin(q),0]; // десен крак
+			body.legL2.rot = [0,0,45+25*sin(t),0]; // ляво коляно
+			body.legR2.rot = [0,0,45+25*sin(q),0]; // дясно коляно
+			body.legL3.rot = [0,0,-80+15*sin(t),0]; // ляво ходило
+			body.legR3.rot = [0,0,-80+15*sin(q),0]; // дясно ходило
+			// тяло
+			body.tor1.rot = [0,0,20,0]; // таз
+			body.tor2.rot = [20*sin(t),0,-10,0];
+			body.tor3.rot = [0,0,15,0]; // гръб
+			// глава
+			body.head.rot = [0,0,10*sin(t/2),40*sin(q/3)];
+			// ръце
+			body.armL1.rot = [0,10,15+45*sin(t),0]; // ляво рамо
+			body.armR1.rot = [0,-10,15+45*sin(q),0]; // дясно рамо
+			body.armL2.rot = [0,0,45+45*sin(t),0]; // ляв лакът
+			body.armR2.rot = [0,0,45+45*sin(q),0]; // десен лакът
+			body.armL3.rot = [0,0,0,90]; // лява длан
+			body.armR3.rot = [0,0,0,90]; // дясна длан
+
+			// рисуване на скелета
+			body.draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Бягащ скелет</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,136 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Терен</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		var n = 256;
+		var data2 = [];
+		for (var x=0; x<=n; x++)
+		{
+			data2[x] = [];
+			for (var y=0; y<=n; y++)
+				data2[x][y] = [x-n/2,y-n/2,0];
+		}
+		
+		function terrain(x1,y1,x2,y2)
+		{
+			var xm = (x1+x2)/2;
+			var ym = (y1+y2)/2;
+			
+			for (var i=0; i<3; i++)
+			{
+				data2[xm][y1][i] = (data2[x1][y1][i]+data2[x2][y1][i])/2;
+				data2[xm][y2][i] = (data2[x1][y2][i]+data2[x2][y2][i])/2;
+				data2[x1][ym][i] = (data2[x1][y1][i]+data2[x1][y2][i])/2;
+				data2[x2][ym][i] = (data2[x2][y1][i]+data2[x2][y2][i])/2;
+				data2[xm][ym][i] = (data2[xm][y1][i]+data2[xm][y2][i])/2;
+
+				var k = (x2-x1)/((i<2)?7:4);
+				data2[xm][y1][i] += random(-k,k);
+				data2[xm][y2][i] += random(-k,k);
+				data2[x1][ym][i] += random(-k,k);
+				data2[x2][ym][i] += random(-k,k);
+				data2[xm][ym][i] += random(-k,k);
+			}
+		}
+		
+		size = n;
+		while (size>1)
+		{
+			for (var x=0; x<n; x+=size)
+				for (var y=0; y<n; y+=size)
+					terrain(x,y,x+size,y+size);
+			size /= 2;
+		}
+		
+		// случаен терен
+		function randomTerrain()
+		{
+			var data = [];
+			for (var x=0; x<=n; x++)
+				for (var y=0; y<=n; y++)
+					data.push(data2[x][y][0],data2[x][y][1],data2[x][y][2]);
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.n = data.length/3;
+			this.center = [0,0,0];
+			this.size = 1;
+			this.color = [0,0,0];
+		}
+		
+		// случаен терен - рисуване
+		randomTerrain.prototype.draw = function()
+		{
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			translate(this.center);
+			scale([this.size,this.size,this.size]);
+			useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				gl.drawArrays(gl.POINTS,0,this.n);
+			popMatrix();
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			// създаване на случаен терен
+			terra = new randomTerrain();
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([300*cos(time/2),300*sin(time/2),200+100*sin(time*2)],[0,0,0],[0,0,1]);
+
+			// рисуване на терена
+			terra.draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Терен</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

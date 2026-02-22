@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Непрекъсната крива</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// B-сплайн крива - конструктор
+		function BSplineCurve(pts)
+		{
+			var data = [];
+			
+			// координати на контролните точки за рисуване на контура
+			for (var i=0; i<4; i++)
+			{
+				for (var j=0; j<2; j++)
+					data.push(pts[i].center[j]);
+				data.push(-0.01);
+			}
+			
+			// използвани само за удобство и краткост
+			function X(i) { return pts[i].center[0]; }
+			function Y(i) { return pts[i].center[1]; }
+			
+			// базисни преливащи функции
+			var B = [];
+			B[0] = function(t) { return (-t*t*t+3*t*t-3*t+1)/6; }
+			B[1] = function(t) { return (3*t*t*t-6*t*t+4)/6; }
+			B[2] = function(t) { return (-3*t*t*t+3*t*t+3*t+1)/6; }
+			B[3] = function(t) { return (t*t*t)/6; }
+			
+			// обхождане на кривата
+			for (var t=0; t<1.05; t+=0.05)
+			{
+				var x = 0;
+				var y = 0;
+				for (var i=0; i<4; i++)
+				{
+					x += B[i](t)*X(i);
+					y += B[i](t)*Y(i);
+				}
+				data.push(x,y,0);
+			}
+			
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.n = data.length/3;
+			this.color = [1,0,0];
+		}
+		
+		// B-сплайн крива - рисуване
+		BSplineCurve.prototype.draw = function()
+		{
+			pushMatrix();
+				gl.vertexAttrib3fv(aNormal,[0,0,1]);
+				useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.disableVertexAttribArray(aNormal);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				
+				// рисуване на самата крива
+				gl.vertexAttrib3fv(aColor,this.color);
+				gl.drawArrays(gl.LINE_STRIP,4,this.n-4);
+				
+				// рисуване на контура
+				if (v<3)
+				{
+					gl.vertexAttrib3fv(aColor,[0.6,0.6,1]);
+					gl.drawArrays(gl.LINE_STRIP,0,4);
+				}
+			popMatrix();
+		}
+		
+		// B-сплайн крива - деструктор
+		BSplineCurve.prototype.free = function()
+		{
+			gl.deleteBuffer(this.buf);
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// създаване на контролни точки, двете крайни са по-големи
+			n = 20;
+			pts = [];
+			for (var i=0; i<n; i++)
+				pts.push( custom(new Sphere([0,0,0],0.15),{color:[0,0.5,1],speed:random(1,1/2)*Math.sign(i%2-0.5),ofs:random(0,2*PI)}) );
+			knots = [0,0];
+			for (var i=0; i<n-1; i++)
+				knots.push(i);
+			knots.push(n-1,n-1);
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		// Няколко варианта на показване на кривата
+		// 		№1 - крива + контролни точки + рамка
+		//		№2 - крива + рамка
+		//		№3 - крива с редуващи се цветове на фрагментите
+		//		№4 - едноцветна крива
+		v = 1;
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([0,0,30],[0,0,0],[0,1,0]);
+
+			// промяна на контролните точки
+			for (var i=0; i<n; i++)
+			{
+				var r = 5+3*sin(i*i+time);
+				var a = time*pts[i].speed+pts[i].ofs;
+				pts[i].center = [1.5*r*cos(a),r*sin(a),0];
+			}
+			
+			// рисуване на контролните точки
+			if (v==1)
+				for (var i=0; i<n; i++)
+					pts[i].draw();
+
+			// създаване и рисуване на кривите
+			for (var i=0; i<knots.length-3; i++)
+			{
+				var curve = new BSplineCurve([pts[knots[i]],pts[knots[i+1]],pts[knots[i+2]],pts[knots[i+3]]]);
+				if (v==2 || v==3) curve.color = [i%2,0,1-i%2];
+				curve.draw();
+				curve.free();
+			}
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		function setV(newV)
+		{
+			v = newV;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Непрекъсната крива</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="setV(1)">Вариант №1</button>
+	<button onclick="setV(2)">Вариант №2</button>
+	<button onclick="setV(3)">Вариант №3</button>
+	<button onclick="setV(4)">Вариант №4</button>
+</body>

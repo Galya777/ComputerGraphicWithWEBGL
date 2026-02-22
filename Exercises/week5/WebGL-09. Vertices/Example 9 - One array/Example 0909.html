@@ -1,0 +1,161 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Един масив</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		
+		attribute vec3 aXYZ;
+		attribute vec3 aColor;
+		varying vec3 vColor;
+		
+		void main ()
+		{
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			gl_Position = uProjectionMatrix * mvMatrix * vec4(aXYZ,1);
+			vColor = aColor;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vColor;
+		void main( )
+		{
+			gl_FragColor = vec4(vColor,1);
+		}
+	</script>
+
+	<script>
+		var N=10;
+		var vCount = (N+1)*(N+1); // брой върхове
+		var iCount = (2*N+2)*N+(2+N%2)*(N-1); // брой индекси
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			aColor = gl.getAttribLocation(glprog,"aColor");
+			gl.vertexAttrib3f(aColor,1,0.5,0);
+
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			// данни за координати на върховете и после индексите
+			// плътно заемат байтовете
+			rawData = new ArrayBuffer(vCount*3*FLOATS+iCount*UINT16S);
+			
+			// създаване на изгледи от реални числа и от 2-байтови цели числа
+			fData = new Float32Array(rawData);
+			iData = new Uint16Array(rawData,vCount*3*FLOATS); // отместване в масива raw
+
+			// попълване на върховете
+			var i = 0;
+			var M = N+1;
+			for (var y=0; y<M; y++)
+				for (var x=0; x<M; x++)
+				{
+					fData[i++] = x;
+					fData[i++] = y;
+					fData[i++] = 0;
+				}
+				
+			// попълване на индексите
+			i = 0;
+			for (var y=0; y<N; y++)
+			{
+				if (y)
+				{
+					iData[i++] = M*y-1;
+					iData[i++] = M*(y+1);
+					if (N%2) iData[i++] = M*(y+1);
+				}
+
+				for (var x=0; x<M; x++)
+				{
+					iData[i++] = x+M*(y+1);
+					iData[i++] = x+M*y;
+				}
+			}
+
+			// WebGL буфер с данни за върховете
+			fBuf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,fBuf);
+			gl.bufferData(gl.ARRAY_BUFFER, fData, gl.STATIC_DRAW);
+
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+
+			// WebGL буфер с данни за индексите
+			iBuf = gl.createBuffer();
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,iBuf);
+			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,iData, gl.STATIC_DRAW);
+		}
+		
+		var frame = 0;
+	
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([N/2,N/2,30], [N/2,N/2,0], [Math.sin(frame/200),Math.cos(frame/200),0]);
+			useMatrix();
+
+			// променяме върховете - всеки се върти по малък кръг
+			// около "традиционното" си местоположение
+			var i = 0;
+			var M = N+1;
+			for (var y=0; y<M; y++)
+				for (var x=0; x<M; x++)
+				{
+					fData[i++] = x+Math.sin(frame/10+x-y)/5;
+					fData[i++] = y+Math.sin(frame/10-x+y)/5;
+					i++;
+				}
+
+			// подаваме наново току-що изчислените координати на върховете
+			gl.bufferData(gl.ARRAY_BUFFER, fData, gl.STATIC_DRAW);
+			gl.drawElements(gl.TRIANGLE_STRIP,iCount,gl.UNSIGNED_SHORT,0);
+
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Един масив</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Крива на Безие</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		n = 3;
+		
+		// крива на Безие - конструктор
+		function BezierCurve(pts)
+		{
+			var data = [];
+			
+			// координати на контролните точки за рисуване на контура
+			for (var i=0; i<n; i++)
+			for (var j=0; j<3; j++)
+				data.push(pts[i].center[j]);
+			
+			// използвани само за удобство и краткост
+			function X(i) { return pts[i].center[0]; }
+			function Y(i) { return pts[i].center[1]; }
+			
+			// обхождане на кривата
+			for (var t=0; t<1.02; t+=0.02)
+			{
+				var x,y;
+				if (n==3)
+				{
+					x = (1-t)*(1-t)*X(0) + 2*t*(1-t)*X(1) + t*t*X(2);
+					y = (1-t)*(1-t)*Y(0) + 2*t*(1-t)*Y(1) + t*t*Y(2);
+				}
+				else
+				{
+					x = (1-t)*(1-t)*(1-t)*X(0) + 3*t*(1-t)*(1-t)*X(1) + 3*t*t*(1-t)*X(2) + t*t*t*X(3);
+					y = (1-t)*(1-t)*(1-t)*Y(0) + 3*t*(1-t)*(1-t)*Y(1) + 3*t*t*(1-t)*Y(2) + t*t*t*Y(3);
+				}
+				data.push(x,y,0);
+			}
+			
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.n = data.length/3;
+			this.color = [1,0,0];
+		}
+		
+		// крива на Безие - рисуване
+		BezierCurve.prototype.draw = function()
+		{
+			pushMatrix();
+				gl.vertexAttrib3fv(aNormal,[0,0,1]);
+				useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.disableVertexAttribArray(aNormal);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				
+				// рисуване на самата крива
+				gl.vertexAttrib3fv(aColor,this.color);
+				gl.drawArrays(gl.LINE_STRIP,n,this.n-n);
+				
+				// рисуване на контура
+				gl.vertexAttrib3fv(aColor,[0.6,0.6,1]);
+				gl.drawArrays(gl.LINE_STRIP,0,n);
+			popMatrix();
+		}
+		
+		// крива на Безие - деструктор
+		BezierCurve.prototype.free = function()
+		{
+			gl.deleteBuffer(this.buf);
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// създаване на контролни точки, двете крайни са по-големи
+			pts = [];
+			for (var i=0; i<4; i++)
+				pts.push( custom(new Sphere([0,0,0],0.25),{color:[0,0.5,1],speed:random(1,1/2)*Math.sign(i%2-0.5),ofs:random(0,2*PI)}) );
+			pts[0].size = 0.35;
+			pts[n-1].size = 0.35;
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([0,0,30],[0,0,0],[0,1,0]);
+
+			// промяна на контролните точки
+			for (var i=0; i<4; i++)
+			{
+				var r = 7-i;
+				var a = time*pts[i].speed+pts[i].ofs;
+				pts[i].center = [r*cos(a),r*sin(a),0];
+			}
+			
+			// рисуване на контролните точки
+			for (var i=0; i<n; i++)
+				pts[i].draw();
+
+			// създаване и рисуване на кривата
+			var curve = new BezierCurve(pts);
+			curve.draw();
+			curve.free();
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// промяна на броя контролни точки
+		function setN(newN)
+		{
+			pts[n-1].size = 0.25;
+			n = newN;
+			for (var i=0; i<4; i++)
+				pts[i].speed=random(1,1/2)*Math.sign(i%2-0.5);
+			pts[n-1].size = 0.35;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Крива на Безие</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	Крива на Безие:
+	<button onclick="setN(3)">Квадратична (n=3)</button>
+	<button onclick="setN(4)">Кубична (n=4)</button>
+</body>

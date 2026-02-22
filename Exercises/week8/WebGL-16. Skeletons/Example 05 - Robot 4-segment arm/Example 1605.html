@@ -1,0 +1,151 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>4-сегментна ръка на робот</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// става и кост - конструктор
+		Bone = function(size)
+		{	
+			this.bone = new Cuboid([0,0,0],size);
+			this.bone.color = [0.5,0.8,0.5];
+			this.bone.offset = [0,0,0.5];
+			this.rot = [0,0,0];
+		}
+
+		// става и кост - метод за рисуване
+		Bone.prototype.draw = function()
+		{	
+			if (this.rot)
+			{
+				if (this.rot[0]) zRotate(this.rot[0]);	// хоризонтален ъгъл
+				if (this.rot[1]) xRotate(this.rot[1]);	// вертикален ъгъл
+				if (this.rot[2]) zRotate(this.rot[2]);	// осев ъгъл
+			}
+			this.bone.draw();
+			translate([0,0,this.bone.size[2]]); // преместване в края на костта
+		}
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.7,0.7,0.7,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// платформа
+			platform = new Prism([0,0,-1],15,1,8);
+			
+			// дефиниране на сегментите
+			n = 4;
+			bone = [];
+			for (var i=0; i<n; i++)
+			{
+				var k = Math.pow(0.9,i); // коефициент на смаляване на размерите
+				bone[i] = new Bone( [4*k*k,1*k*k,9*k] );
+			}
+		}
+
+		var frame = 0;
+		
+		var time = now();
+		var oldTime = time;
+		function now() { return (new Date()).getTime()/1000; }
+		
+		var dir = -1;	// направление, по което ще има промяна (0,1 или 2)
+		var bNo = -1;	// номер на кост, в чиято става има промяна (0 до n-1)
+		var aNo = -1;	// вектор с базовите ъгли (sin от тях дава реалните ъгли)
+		
+		var alpha = [0,0,0,0,0,0,0]; // базови ъгли
+		var range = [180,70,120,120,180,160,90]; // максимално отклонение на въртенето
+		
+		function drawFrame()
+		{
+			time = now();
+			var dTime = time-oldTime;
+			oldTime = time;
+			
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([75*cos(time/5),75*sin(time/5),20],[0,0,13],[0,0,1]);
+
+			// рисуване на платформата
+			platform.draw();
+			
+			// променяме един от ъглите в ставата
+			if (aNo>=0)
+			{
+				alpha[aNo] += dTime;
+				bone[bNo].rot[dir] = range[aNo]*sin(alpha[aNo]);
+			}
+
+			// рисуване на роботската ръка
+			pushMatrix();
+			for (var i=0; i<n; i++)
+				bone[i].draw();
+			popMatrix();
+
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// активираме кост newBNo, ъгъл newDir и базов ъгъл newADir
+		// ако тази кост е вече активна, деактивираме я, без да активираме друга кост
+		function setDir(newBNo,newDir,newANo)
+		{
+			if (newANo!=aNo)
+			{
+				dir = newDir;
+				aNo = newANo;
+				bNo = newBNo;
+			}
+			else
+				aNo = -1;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>4-сегментна ръка на робот</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="setDir(0,0,0)">Основа<br>въртене</button>
+	<button onclick="setDir(0,1,1)">Основа<br>наклон</button>
+	<button onclick="setDir(1,1,2)">Първи<br>сегмент</button>
+	<button onclick="setDir(2,1,3)">Втори<br>сегмент</button>
+	<button onclick="setDir(3,0,4)">Накрайник<br>въртене</button>
+	<button onclick="setDir(3,1,5)">Накрайник<br>наклон</button>
+	<button onclick="setDir(3,2,6)">Накрайник<br>въртене-ос</button>
+	
+</body>

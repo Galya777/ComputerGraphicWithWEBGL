@@ -1,0 +1,217 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Прескачане на препятствия</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		uniform mat4 uNormalMatrix; // матрица за нормалните вектори
+		uniform bool uUseNormalMatrix; // дали матрицата се подава отвън
+		
+		uniform bool uUseAmbient;
+		uniform vec3 uAmbientColor;
+
+		uniform bool uUseDiffuse;
+		uniform vec3 uDiffuseColor;
+
+		uniform vec3 uLightDir;
+		
+		attribute vec3 aXYZ;
+		attribute vec3 aColor;
+		attribute vec3 aNormal;
+
+		varying vec3 vColor;
+		
+		void main ()
+		{
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			gl_Position = uProjectionMatrix * mvMatrix * vec4(aXYZ,1);
+			mat4 nMatrix = uUseNormalMatrix?uNormalMatrix:mvMatrix;
+			
+			// околна светлина
+			if (uUseAmbient)
+				vColor = uAmbientColor*aColor;
+			else
+				vColor = aColor;
+
+			// дифузно отражение
+			if (uUseDiffuse)
+			{
+				vec3 light = normalize(-uLightDir);
+				vec3 normal = vec3(normalize(nMatrix*vec4(aNormal,0)));
+				vColor += aColor*uDiffuseColor*max(dot(normal,light),0.0);
+			}
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vColor;
+		void main( )
+		{
+			gl_FragColor = vec4(vColor,1);
+		}
+	</script>
+
+
+
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+			uNormalMatrix = gl.getUniformLocation(glprog,"uNormalMatrix");
+			uUseNormalMatrix = gl.getUniformLocation(glprog,"uUseNormalMatrix");
+			
+			aColor = gl.getAttribLocation(glprog,"aColor");
+			uAmbientColor = gl.getUniformLocation(glprog,"uAmbientColor");
+			uUseAmbient   = gl.getUniformLocation(glprog,"uUseAmbient");
+
+			aNormal = gl.getAttribLocation(glprog,"aNormal");
+			uDiffuseColor = gl.getUniformLocation(glprog,"uDiffuseColor");
+			uUseDiffuse = gl.getUniformLocation(glprog,"uUseDiffuse");
+			uLightDir = gl.getUniformLocation(glprog,"uLightDir");
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.1,0.1,0.1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.2,0.2);
+			gl.uniform1i(uUseAmbient,true);
+
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform1i(uUseDiffuse,true);
+			
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// дефиниране на обектите
+			SPHERE_SIDES = 64;
+			bigBall = new Sphere([0,0,0],20);
+			bar1 = new Spheroid([0,0,0],[19.2,23,3]);
+			bar2 = new Spheroid([0,0,0],[19.2,23,3]);
+			SPHERE_SIDES = 6;
+			n = 120;
+			ball = [];
+			for (var i=0; i<n; i++)
+			{
+				ball[i] = new Sphere([0,0,0],1);
+				ball[i].color = [random(0.6,1),random(0.6,1),random(0.6,1)];
+				ball[i].a = random(0,2*PI);	// отместване по окръжността
+				ball[i].v = random(0.5,1); // скорост на движение
+				ball[i].d = radians(40); // ъглова дължина на скока
+				ball[i].h = 6; // височина на скока
+			}
+		}
+		
+		function now()
+		{
+			return (new Date()).getTime()/1000;
+		}
+		
+		// функция, която определя дали има скок и колко е той
+		function jump(a,b,ball)
+		{
+			var d = ball.d; // ъглова полудължина на скока
+			var h = ball.h; // височина на скока
+			
+			a = a % (2*PI); // нормализираме двата ъгъла (на топчето
+			b = b % (2*PI); // и на преградата) в диапазона -2PI..2PI
+
+			for (var i=0; i<3; i++)
+			{
+				// ако ъглите са близки - имаме скок
+				if ( Math.abs(a-b)<d )
+					return h*cos((a-b)/d*PI/2);
+				// намаляваме интервала и пробваме пак
+				b+=2*PI;
+			}
+			
+			// нямаме скок
+			return 0;
+		}
+		
+		var frame = 0;
+		var oldTime = now();
+		function drawFrame()
+		{
+			var time = now();
+			var dTime = time-oldTime;
+			oldTime = time;
+			
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([100,0,0],[0,0,0],[0,0,1]);
+
+			// позиция на преградите
+			var t = time;
+			angle = -40*t+50*sin(t/2);
+
+			// позиция на сферите - проверяваме дали има
+			// скок спрямо 4-те прегради
+			for (var i=0; i<n; i++)
+			{
+				var a=ball[i].v*time+ball[i].a;
+				var r = 21+Math.max(
+					jump(a,radians(angle),ball[i]),
+					jump(a,radians(angle+90),ball[i]),
+					jump(a,radians(angle+180),ball[i]),
+					jump(a,radians(angle+270),ball[i])		
+				);
+				ball[i].center = [0,r*cos(a),r*sin(a)];
+			}
+
+			// рисуване на обектите
+			bigBall.draw();
+			pushMatrix();
+				xRotate(-angle); // завъртане на първата преграда
+				bar1.draw();
+				xRotate(-90); // завъртане на втората спрямо първата
+				bar2.draw();
+			popMatrix();
+			for (var i=0; i<n; i++)
+				ball[i].draw();
+				
+			requestAnimationFrame(drawFrame);
+		}
+
+		function touch() { vTime = now(); }
+		
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Прескачане на препятствия</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

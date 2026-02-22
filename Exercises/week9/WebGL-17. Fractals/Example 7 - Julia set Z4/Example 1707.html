@@ -1,0 +1,106 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Множество на Жюлиа Z^4</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.clearColor(1,1,1,1);
+
+			var data = [1,-1,1,1,-1,-1,-1,1];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+
+		var mode = 4;
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			switch (mode)
+			{
+				case 1:
+					var a = 0.25+0.05*sin(time/2);
+					gl.uniform2fv(uCenter,[0,0]);
+					gl.uniform2fv(uC,[2*sin(0.8*a),cos(0.5*a)]);
+					gl.uniform1f(uScale,0);
+					gl.uniform1f(uLimit,7);
+					break;
+				case 2:
+					var a = time;
+					gl.uniform2fv(uCenter,[0,0]);
+					gl.uniform2fv(uC,[2*sin(0.8*a),cos(0.5*a)]);
+					gl.uniform1f(uScale,-0.5);
+					gl.uniform1f(uLimit,5+3*sin(a));
+					break;
+				case 3:
+					var a = time/3;
+					gl.uniform2fv(uCenter,[0,0]);
+					gl.uniform2fv(uC,[-1.24+0.0001*sin(3*a),0]);
+					gl.uniform1f(uScale,1.5+1*sin(2*a));
+					gl.uniform1f(uLimit,13+5*sin(5*a));
+					break;
+				case 4:
+					var a = time/3;
+					gl.uniform2fv(uCenter,[0,0]);
+					gl.uniform2fv(uC,[1.1*sin(2*a),0]);
+					gl.uniform1f(uScale,-0.2+0*sin(a));
+					gl.uniform1f(uLimit,13+8*sin(5*a));
+					break;
+			}
+			gl.enableVertexAttribArray(aXY);
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+			
+			requestAnimationFrame(drawFrame);
+		}
+
+		// нов режим
+		function setMode(m)
+		{
+			mode = m;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Множество на Жюлиа Z<sup>4</sup></h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="setMode(0)">Стоп</button>
+	<button onclick="setMode(1)">Пример 1</button>
+	<button onclick="setMode(2)">Пример 2</button>
+	<button onclick="setMode(3)">Пример 3</button>
+	<button onclick="setMode(4)">Пример 4</button>
+</body>

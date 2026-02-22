@@ -1,0 +1,241 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Тор</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		uniform mat4 uNormalMatrix; // матрица за нормалните вектори
+		uniform bool uUseNormalMatrix; // дали матрицата се подава отвън
+		
+		uniform bool uUseAmbient;
+		uniform vec3 uAmbientColor;
+
+		uniform bool uUseDiffuse;
+		uniform vec3 uDiffuseColor;
+
+		uniform vec3 uLightDir;
+		
+		attribute vec3 aXYZ;
+		attribute vec3 aColor;
+		attribute vec3 aNormal;
+
+		varying vec3 vColor;
+		varying vec4 vXYZT;
+		
+		void main ()
+		{
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			gl_Position = uProjectionMatrix * mvMatrix * vec4(aXYZ,1);
+			mat4 nMatrix = uUseNormalMatrix?uNormalMatrix:mvMatrix;
+			
+			// околна светлина
+			if (uUseAmbient)
+				vColor = uAmbientColor*aColor;
+			else
+				vColor = aColor;
+
+			// дифузно отражение
+			if (uUseDiffuse)
+			{
+				vec3 light = normalize(-uLightDir);
+				vec3 normal = vec3(normalize(nMatrix*vec4(aNormal,0)));
+				vColor += aColor*uDiffuseColor*max(dot(normal,light),0.0);
+			}
+
+			vXYZT = vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		
+		uniform vec4 uClipPlane[8]; // масив от коефициенти на 8 равнини
+
+		varying vec3 vColor;
+		varying vec4 vXYZT;
+		void main( )
+		{
+			// изрязване по 8 равнини
+			for (int i=0; i<8; i++)
+				if (dot(vXYZT,uClipPlane[i])<0.0) discard;
+				
+			gl_FragColor = vec4(vColor,1);
+		}
+	</script>
+
+	<script>
+		var TORUS_MAJOR_SIDES = 50;
+		var TORUS_MINOR_SIDES = 25;
+		
+		// тор - конструктор
+		Torus = function(center,size,R,r)
+		{	
+			// пресмята връх от два ъгъла
+			function vertex(a,b)
+			{
+				var x = (R+r*Math.cos(b))*Math.cos(a);
+				var y = (R+r*Math.cos(b))*Math.sin(a);
+				var z = r*Math.sin(b);
+				return [x,y,z];
+			}
+
+			// пресмята нормален вектор във връх с ъгъл a и височина z
+			function normal(a,b)
+			{
+				var u = [-Math.cos(a)*Math.sin(b),-Math.sin(b)*Math.sin(a),Math.cos(b)];
+				var v = [-Math.sin(a),Math.cos(a),0];
+				return unitVector(vectorProduct(v,u));
+			}
+				
+			// попълва в буфера връх и нормалния му вектор
+			function dataPush(a,b)
+			{	
+				var p = vertex(a,b);
+				var n = normal(a,b);
+				data.push(p[0],p[1],p[2],n[0],n[1],n[2]);
+			}
+			
+			var data = [];
+			
+			var dA = 2*Math.PI/TORUS_MAJOR_SIDES;
+			var dB = 2*Math.PI/TORUS_MINOR_SIDES;
+
+			// генериране на ленти (по b)
+			for (var bi=0; bi<TORUS_MINOR_SIDES; bi++)
+			{
+				var b1 = bi*dB;
+				var b2 = (bi+1)*dB;
+				
+				// генериране на лента (по a)
+				for (var ai=0; ai<=TORUS_MAJOR_SIDES; ai++)
+				{
+					var a = ai*dA;
+					dataPush(a,b1);
+					dataPush(a,b2);
+				}
+			}
+
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			
+			// запомняме брой ленти, брой триъгълници, буфера, центъра, размера, цвета
+			this.l = TORUS_MINOR_SIDES;
+			this.n = TORUS_MAJOR_SIDES*2+2;
+			this.buf = buf;
+			this.center = center;
+			this.size = size;
+			this.color = [0.5,0.75,1];
+		}
+
+		// тор - метод за рисуване
+		Torus.prototype.draw = function()
+		{	
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			translate(this.center);
+			scale([this.size,this.size,this.size]);
+			useMatrix();
+
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			// върхове
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,6*FLOATS,0*FLOATS);
+			// нормали
+			gl.enableVertexAttribArray(aNormal);
+			gl.vertexAttribPointer(aNormal,3,gl.FLOAT,false,6*FLOATS,3*FLOATS);
+			// рисуваме лентите
+			for (var i=0; i<this.l; i++)
+			{
+				gl.drawArrays(gl.TRIANGLE_STRIP,this.n*i,this.n);
+			}
+
+			popMatrix();
+		}
+
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+			uNormalMatrix = gl.getUniformLocation(glprog,"uNormalMatrix");
+			uUseNormalMatrix = gl.getUniformLocation(glprog,"uUseNormalMatrix");
+			
+			aColor = gl.getAttribLocation(glprog,"aColor");
+			uAmbientColor = gl.getUniformLocation(glprog,"uAmbientColor");
+			uUseAmbient   = gl.getUniformLocation(glprog,"uUseAmbient");
+
+			aNormal = gl.getAttribLocation(glprog,"aNormal");
+			uDiffuseColor = gl.getUniformLocation(glprog,"uDiffuseColor");
+			uUseDiffuse = gl.getUniformLocation(glprog,"uUseDiffuse");
+			uLightDir = gl.getUniformLocation(glprog,"uLightDir");
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.85,0.85,0.8,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.1,0,0.3);
+			gl.uniform1i(uUseAmbient,true);
+
+			gl.uniform3f(uDiffuseColor,1,1,0.9);
+			gl.uniform1i(uUseDiffuse,true);
+			
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// дефиниране на тор
+			tor = new Torus ([0,0,0],1,6,2);
+		}
+		
+		var frame = 0;
+	
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			lookAt([35*Math.cos(frame/100),35*Math.sin(frame/100),5*Math.sin(frame/180)], [0,0,0], [0,0,1]);
+			yRotate(0.5);
+
+			// рисуване на тор
+			tor.draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Тор</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Драконова равнина</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		var color;
+		var data = [0,0,0];	// буфер с върхове
+		var mat = unitMatrix(); // работна матрица
+		
+		// придвижва локалната координатна система
+		// на матрицата напред 1 стъпка по оста X
+		function F()
+		{
+			mat[12] += mat[0];
+			mat[13] += mat[1];
+			mat[14] += mat[2];
+			data.push(mat[12],mat[13],mat[14]);
+		}
+		// завърта локалната координатна система на матрицата
+		// от оста Y към оста X на 90 градуса около оста Z
+		function R()
+		{
+			var a;
+			a=mat[0]; mat[0]=-mat[4]; mat[4]=a;
+			a=mat[1]; mat[1]=-mat[5]; mat[5]=a;
+			a=mat[2]; mat[2]=-mat[6]; mat[6]=a;
+		}
+		// завърта локалната координатна система на матрицата
+		// от оста X към оста Y на A градуса около оста Z
+		function L()
+		{
+			var a;
+			a=-mat[0]; mat[0]=mat[4]; mat[4]=a;
+			a=-mat[1]; mat[1]=mat[5]; mat[5]=a;
+			a=-mat[2]; mat[2]=mat[6]; mat[6]=a;
+		}
+
+		// драконова крива - конструктор
+		function curveDragon()
+		{
+			for (var i=1; i<500000; i++)
+			{
+				F();
+				if (((i&-i)<<1)&i)
+					L();
+				else
+					R();
+			}
+			
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.n = data.length/3;
+			this.center = [0,0,0];
+			this.size = 1;
+			this.color = [0,0.5,1];
+		}
+		
+		// драконова крива - рисуване
+		curveDragon.prototype.draw = function()
+		{
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			translate(this.center);
+			scale([this.size,this.size,this.size]);
+			useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				gl.drawArrays(gl.LINE_STRIP,0,this.n);
+			popMatrix();
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			// създаване на драконова крива
+			dragon = new curveDragon();
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([0,0,340+290*sin(time/3)],[0,0,0],[0,1,0]);
+
+			// рисуване на кривата със завъртане на ъгъл A
+			var a = cos(time/2);
+			a = 45+45*Math.sign(a)*Math.pow(Math.abs(a),1/10);
+			pushMatrix();
+				dragon.color = [0,0.5,1];
+				dragon.draw();
+				zRotate(a);
+				dragon.color = [1,0.3,0];
+				dragon.draw();
+				zRotate(a);
+				dragon.color = [1,0.9,0];
+				dragon.draw();
+				zRotate(a);
+				dragon.color = [0,0,0];
+				dragon.draw();
+			popMatrix();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Драконова равнина</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

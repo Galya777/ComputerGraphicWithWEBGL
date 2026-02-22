@@ -1,0 +1,225 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Повърхнина на Безие - стъпка 1</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// мрежа NxN - конструктор
+		function GridNxN(n)
+		{
+			this.data = [];
+			for (var i=0; i<2*n*n; i++)
+				this.data.push(0,0,0);
+			this.data = new Float32Array(this.data);
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER,this.data, gl.DYNAMIC_DRAW);
+			this.n = n;
+			this.color = [0.5,0.75,1];
+		}
+			
+		// мрежа NxN - задаване на контролни точки
+		GridNxN.prototype.set = function(p)
+		{
+			var m=0;
+
+			// обхождане на мрежата по едното направление
+			for (var i=0; i<this.n; i++)
+			for (var j=0; j<this.n; j++)
+			for (var k=0; k<3; k++) // цикъл по координата x,y,z
+				this.data[m++] = p[i][j].center[k];
+
+			// обхождане на мрежата по другото направление
+			for (var j=0; j<this.n; j++)
+			for (var i=0; i<this.n; i++)
+			for (var k=0; k<3; k++) // цикъл по координата x,y,z
+				this.data[m++] = p[i][j].center[k];
+			
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferSubData(gl.ARRAY_BUFFER,0,this.data);
+		}
+		
+		// мрежа NxN - рисуване
+		GridNxN.prototype.draw = function()
+		{
+			pushMatrix();
+				gl.vertexAttrib3fv(aNormal,[0,0,1]);
+				useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.disableVertexAttribArray(aNormal);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				gl.vertexAttrib3fv(aColor,this.color);
+				for (var i=0; i<this.n; i++)
+				{
+					gl.drawArrays(gl.LINE_STRIP,i*this.n,this.n);
+					gl.drawArrays(gl.LINE_STRIP,(i+this.n)*this.n,this.n);
+				}
+			popMatrix();
+		}
+
+		var BEZIER_POINTS = 25;
+		
+		// крива на Безие - конструктор
+		function BezierCurve()
+		{
+			this.data = [];
+			for (var i=0; i<BEZIER_POINTS; i++) this.data.push(0,0,0);
+			this.data = new Float32Array(this.data);
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER,this.data, gl.DYNAMIC_DRAW);
+			this.n = this.data.length/3;
+			this.color = [1,0,0];
+		}
+
+		// базисни функции
+		var B = [];
+		B[0] = function (t) { return (1-t)*(1-t)*(1-t); }
+		B[1] = function (t) { return 3*(1-t)*(1-t)*t; }
+		B[2] = function (t) { return 3*(1-t)*t*t; }
+		B[3] = function (t) { return t*t*t; }
+		
+		// крива на Безие - задаване на 4 контролни точки
+		BezierCurve.prototype.set = function(p)
+		{
+			// обхождане на кривата
+			var m=-1;
+			for (var i=0; i<BEZIER_POINTS; i++) // цикъл по точките от кривата
+			{
+				var t = i/(BEZIER_POINTS-1);
+				for (var k=0; k<3; k++) // цикъл по координатите x,y,z
+				{
+					this.data[++m] = 0;
+					for (var j=0; j<4; j++) // цикъл по контролните точки
+						this.data[m] += B[j](t)*p[j].center[k];
+				}
+			}
+			
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferSubData(gl.ARRAY_BUFFER,0,this.data);
+		}
+		
+		// крива на Безие - рисуване
+		BezierCurve.prototype.draw = function()
+		{
+			pushMatrix();
+				gl.vertexAttrib3fv(aNormal,[0,0,1]);
+				useMatrix();
+				gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+				gl.disableVertexAttribArray(aNormal);
+				gl.enableVertexAttribArray(aXYZ);
+				gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+				gl.vertexAttrib3fv(aColor,this.color);
+				gl.drawArrays(gl.LINE_STRIP,0,this.n);
+			popMatrix();
+		}
+		
+		// крива на Безие - деструктор
+		BezierCurve.prototype.free = function()
+		{
+			gl.deleteBuffer(this.buf);
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// създаване на контролни точки
+			p = [];
+			for (var i=0; i<4; i++)
+			{
+				p[i] = [];
+				for (var j=0; j<4; j++)
+				{
+					p[i][j] = new Sphere([i-1.5,j-1.5,0],0.1);
+					p[i][j].speed = random(4,2);
+					p[i][j].ofs = random(0,2*PI);
+				}
+			}
+			grid = new GridNxN(4);
+			c = [];
+			for (var i=0; i<4; i++)
+				c[i] = new BezierCurve();
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([10*cos(time/3),10*sin(time/3),6+3*sin(time/2)],[0,0,0],[0,0,1]);
+
+			// промяна на контролните точки
+			var amp = 0.5+0.4*sin(time/2); // амплитуда на промяната
+			for (var i=0; i<4; i++)
+			for (var j=0; j<4; j++)
+			{
+				p[i][j].center = [1.5*(i-1.5)+amp*0.4*cos(time+i*j+i),1.5*(j-1.5)+amp*0.4*cos(time+j*(i+2)),amp*sin(time*p[i][j].speed+p[i][j].ofs)];
+			}
+			
+			// рисуване на контролните точки
+			for (var i=0; i<4; i++)
+			for (var j=0; j<4; j++)
+				p[i][j].draw();
+
+			// актуализация и рисуване на мрежата
+			grid.set(p);
+			grid.draw();
+			
+			// актуализиране на кривите
+			c[0].set([p[0][0],p[1][0],p[2][0],p[3][0]]);
+			c[1].set([p[0][3],p[1][3],p[2][3],p[3][3]]);
+			c[2].set([p[0][0],p[0][1],p[0][2],p[0][3]]);
+			c[3].set([p[3][0],p[3][1],p[3][2],p[3][3]]);
+			
+			// рисуване на кривите
+			for (var i=0; i<4; i++)
+				c[i].draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Повърхнина на Безие - стъпка 1</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

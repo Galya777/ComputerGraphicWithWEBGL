@@ -1,0 +1,109 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Биоморфи</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.clearColor(1,1,1,1);
+
+			var data = [1,-1,1,1,-1,-1,-1,1];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+
+		var mode = 4;
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			// 4 разлинчи пози (ръчно избрани)
+			switch (mode)
+			{
+				case 1:
+					gl.uniform2fv(uCenter,[0,0]);
+					gl.uniform2fv(uC,[0,0.85+0.03*sin(3*time)]);
+					gl.uniform1f(uN,9);
+					gl.uniform1f(uK,2);
+					gl.uniform1f(uScale,-0.28);
+					break;
+				case 2:
+					gl.uniform2fv(uCenter,[0,0]);
+					gl.uniform2fv(uC,[0,0.01*sin(3*time)]);
+					gl.uniform1f(uN,4);
+					gl.uniform1f(uK,-1);
+					gl.uniform1f(uScale,-0.05);
+					break;
+				case 3:
+					var a = 1.5+sin(time+2*cos(time))/15;
+					gl.uniform2fv(uCenter,[0.6-sin(a)/5,-0.25]);
+					gl.uniform2fv(uC,[0.5+0.5*cos(a),0.5+0.5*sin(a)]);
+					gl.uniform1f(uN,6+cos(0*time));
+					gl.uniform1f(uK,3+sin(0*time));
+					gl.uniform1f(uScale,2);
+					break;
+				case 4:
+					var a = 0.4+0.2*sin(time+2*cos(time))/15;
+					gl.uniform2fv(uCenter,[0.48,-0.425]);
+					gl.uniform2fv(uC,[0.5+0.7*cos(a),0.5+0.5*sin(a)]);
+					gl.uniform1f(uN,6+cos(6*time)/500);
+					gl.uniform1f(uK,4+sin(2.34*time)/500);
+					gl.uniform1f(uScale,3.5);
+					break;
+			}
+			gl.enableVertexAttribArray(aXY);
+			gl.vertexAttribPointer(aXY,2,gl.FLOAT,false,0,0);
+			gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+			
+			requestAnimationFrame(drawFrame);
+		}
+
+		// нов режим
+		function setMode(m)
+		{
+			mode = m;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Биоморфи</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="setMode(0)">Стоп</button>
+	<button onclick="setMode(1)">Пример 1</button>
+	<button onclick="setMode(2)">Пример 2</button>
+	<button onclick="setMode(3)">Пример 3</button>
+	<button onclick="setMode(4)">Пример 4</button>
+</body>

@@ -1,0 +1,386 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Възелът</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		
+		uniform bool uUseAmbient;
+		uniform vec3 uAmbientColor;
+
+		uniform bool uUseDiffuse;
+		uniform vec3 uDiffuseColor;
+
+		uniform vec3 uLightDir;
+		
+		attribute vec3 aXYZ;		// координати на връх
+		attribute vec3 aColor;		// цвят на връх
+		attribute vec3 aNormal;	// нормален вектор на връх
+
+		varying vec3 vNormal;
+		varying vec3 vColor;
+		varying vec3 vPos;
+		
+		void main ()
+		{
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			vec4 pos = mvMatrix * vec4(aXYZ,1);
+			gl_Position = uProjectionMatrix * pos;
+
+			// околна светлина
+			vColor = aColor;
+			if (uUseAmbient)
+				vColor *= uAmbientColor;
+			
+			// дифузно отражение
+			vec3 normal = vec3(normalize(mvMatrix*vec4(aNormal,0)));
+			vec3 light = normalize(-uLightDir);
+			if (uUseDiffuse)
+				vColor += aColor*uDiffuseColor*max(dot(normal,light),0.0);
+
+			vPos = pos.xyz/pos.w;
+			vNormal = normal;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+
+		// преместено тук от другия шейдър
+		uniform highp vec3 uLightDir;
+		uniform bool uUseSpecular;
+		uniform vec3 uSpecularColor;
+
+		varying vec3 vNormal;
+		varying vec3 vColor;
+		varying vec3 vPos;
+
+		void main( )
+		{
+			vec3 light = normalize(-uLightDir);
+			
+			// намиране на отразения лъч
+			vec3 reflectedLight = normalize(reflect(light,normalize(vNormal)));
+
+			// в локалната координатна система "окото" на гледащия е в (0,0,0),
+			// а векторът от точката до "окото" е pos-(0,0,0) = pos
+			vec3 viewDir = normalize(vPos);
+
+			// готови сме да сметнем лъскавината
+			float cosa = max(dot(reflectedLight,viewDir),0.0);
+			vec3 specularColor = vec3(pow(cosa,5.0));
+			gl_FragColor = vec4(vColor+specularColor,1);
+		}
+	</script>
+
+	<script>
+		// Трилистен възел - конструктор
+		TrefoilKnot = function(center, size)
+		{	
+			this.center = center;
+			this.size = size;
+			
+			// Параметри на тръбата
+			var tubeRadius = 0.3;
+			var segments = 100;    // брой сегмента по дължината на възела
+			var sides = 12;        // брой страни на тръбата
+			
+			// Функция за изчисляване на точка от трилистния възел
+			function trefoilPoint(t)
+			{
+				var x = Math.sin(t) + 2 * Math.sin(2 * t);
+				var y = Math.cos(t) - 2 * Math.cos(2 * t);
+				var z = -Math.sin(3 * t);
+				return [x, y, z];
+			}
+			
+			// Функция за изчисляване на допирателния вектор
+			function trefoilTangent(t)
+			{
+				var dx = Math.cos(t) + 4 * Math.cos(2 * t);
+				var dy = -Math.sin(t) + 4 * Math.sin(2 * t);
+				var dz = -3 * Math.cos(3 * t);
+				// Нормализираме
+				var len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+				return [dx/len, dy/len, dz/len];
+			}
+			
+			// Функция за изчисляване на нормалата на тръбата
+			function trefoilNormal(t)
+			{
+				// Втора производна (нормала на Френе)
+				var ddx = -Math.sin(t) - 8 * Math.sin(2 * t);
+				var ddy = -Math.cos(t) + 8 * Math.cos(2 * t);
+				var ddz = 9 * Math.sin(3 * t);
+				var len = Math.sqrt(ddx*ddx + ddy*ddy + ddz*ddz);
+				return [ddx/len, ddy/len, ddz/len];
+			}
+			
+			// Създаваме геометрията на тръбата
+			var vertices = [];
+			var normals = [];
+			var colors = [];
+			
+			// Основни цветове за трилистния възел
+			var baseColor = [0.2, 0.6, 1.0]; // светло синьо
+			var color2 = [1.0, 0.4, 0.0];     // оранжево
+			
+			for (var i = 0; i < segments; i++)
+			{
+				var t1 = (i / segments) * 2 * Math.PI;
+				var t2 = ((i + 1) / segments) * 2 * Math.PI;
+				
+				// Точки от кривата
+				var p1 = trefoilPoint(t1);
+				var p2 = trefoilPoint(t2);
+				
+				// Допирателни вектори
+				var tangent1 = trefoilTangent(t1);
+				var tangent2 = trefoilTangent(t2);
+				
+				// Нормали на Френе
+				var normal1 = trefoilNormal(t1);
+				var normal2 = trefoilNormal(t2);
+				
+				// Би-нормали (cross product)
+				var binormal1 = [
+					tangent1[1]*normal1[2] - tangent1[2]*normal1[1],
+					tangent1[2]*normal1[0] - tangent1[0]*normal1[2],
+					tangent1[0]*normal1[1] - tangent1[1]*normal1[0]
+				];
+				var binormal2 = [
+					tangent2[1]*normal2[2] - tangent2[2]*normal2[1],
+					tangent2[2]*normal2[0] - tangent2[0]*normal2[2],
+					tangent2[0]*normal2[1] - tangent2[1]*normal2[0]
+				];
+				
+				// За всяка страна на тръбата
+				for (var j = 0; j < sides; j++)
+				{
+					var angle1 = (j / sides) * 2 * Math.PI;
+					var angle2 = ((j + 1) / sides) * 2 * Math.PI;
+					
+					// Изчисляваме ъглите за двете секции
+					var sin1 = Math.sin(angle1);
+					var cos1 = Math.cos(angle1);
+					var sin2 = Math.sin(angle2);
+					var cos2 = Math.cos(angle2);
+					
+					// Върхове за един четириъгълник (2 триъгълника)
+					// p1: точка от кривата при t1
+					// p2: точка от кривата при t2
+					
+					// Нормали за първата секция
+					var n1 = [
+						normal1[0] * cos1 + binormal1[0] * sin1,
+						normal1[1] * cos1 + binormal1[1] * sin1,
+						normal1[2] * cos1 + binormal1[2] * sin1
+					];
+					var n1b = [
+						normal1[0] * cos2 + binormal1[0] * sin2,
+						normal1[1] * cos2 + binormal1[1] * sin2,
+						normal1[2] * cos2 + binormal1[2] * sin2
+					];
+					
+					// Нормали за втората секция
+					var n2 = [
+						normal2[0] * cos1 + binormal2[0] * sin1,
+						normal2[1] * cos1 + binormal2[1] * sin1,
+						normal2[2] * cos1 + binormal2[2] * sin1
+					];
+					var n2b = [
+						normal2[0] * cos2 + binormal2[0] * sin2,
+						normal2[1] * cos2 + binormal2[1] * sin2,
+						normal2[2] * cos2 + binormal2[2] * sin2
+					];
+					
+					// Позиции на върховете
+					var v1 = [
+						p1[0] + tubeRadius * (n1[0] * cos1 + binormal1[0] * sin1),
+						p1[1] + tubeRadius * (n1[1] * cos1 + binormal1[1] * sin1),
+						p1[2] + tubeRadius * (n1[2] * cos1 + binormal1[2] * sin1)
+					];
+					var v1b = [
+						p1[0] + tubeRadius * (n1b[0] * cos2 + binormal1[0] * sin2),
+						p1[1] + tubeRadius * (n1b[1] * cos2 + binormal1[1] * sin2),
+						p1[2] + tubeRadius * (n1b[2] * cos2 + binormal1[2] * sin2)
+					];
+					var v2 = [
+						p2[0] + tubeRadius * (n2[0] * cos1 + binormal2[0] * sin1),
+						p2[1] + tubeRadius * (n2[1] * cos1 + binormal2[1] * sin1),
+						p2[2] + tubeRadius * (n2[2] * cos1 + binormal2[2] * sin1)
+					];
+					var v2b = [
+						p2[0] + tubeRadius * (n2b[0] * cos2 + binormal2[0] * sin2),
+						p2[1] + tubeRadius * (n2b[1] * cos2 + binormal2[1] * sin2),
+						p2[2] + tubeRadius * (n2b[2] * cos2 + binormal2[2] * sin2)
+					];
+					
+					// Добавяме двата триъгълника
+					// Първи триъгълник
+					vertices.push(v1[0], v1[1], v1[2]);
+					vertices.push(v1b[0], v1b[1], v1b[2]);
+					vertices.push(v2[0], v2[1], v2[2]);
+					
+					normals.push(n1[0], n1[1], n1[2]);
+					normals.push(n1b[0], n1b[1], n1b[2]);
+					normals.push(n2[0], n2[1], n2[2]);
+					
+					// Цвят със зависимост от ъгъла
+					var c1 = (Math.sin(angle1 * 3) + 1) / 2;
+					var c = [
+						baseColor[0] * (1-c1) + color2[0] * c1,
+						baseColor[1] * (1-c1) + color2[1] * c1,
+						baseColor[2] * (1-c1) + color2[2] * c1
+					];
+					colors.push(c[0], c[1], c[2]);
+					colors.push(c[0], c[1], c[2]);
+					colors.push(c[0], c[1], c[2]);
+					
+					// Втори триъгълник
+					vertices.push(v1b[0], v1b[1], v1b[2]);
+					vertices.push(v2b[0], v2b[1], v2b[2]);
+					vertices.push(v2[0], v2[1], v2[2]);
+					
+					normals.push(n1b[0], n1b[1], n1b[2]);
+					normals.push(n2b[0], n2b[1], n2b[2]);
+					normals.push(n2[0], n2[1], n2[2]);
+					
+					var c2 = (Math.sin(angle2 * 3) + 1) / 2;
+					c = [
+						baseColor[0] * (1-c2) + color2[0] * c2,
+						baseColor[1] * (1-c2) + color2[1] * c2,
+						baseColor[2] * (1-c2) + color2[2] * c2
+					];
+					colors.push(c[0], c[1], c[2]);
+					colors.push(c[0], c[1], c[2]);
+					colors.push(c[0], c[1], c[2]);
+				}
+			}
+			
+			// Създаваме WebGL буфер
+			var data = [];
+			for (var i = 0; i < vertices.length / 3; i++)
+			{
+				data.push(vertices[i*3], vertices[i*3+1], vertices[i*3+2]);
+				data.push(colors[i*3], colors[i*3+1], colors[i*3+2]);
+				data.push(normals[i*3], normals[i*3+1], normals[i*3+2]);
+			}
+			
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			
+			this.vertexCount = vertices.length / 3;
+		}
+
+		// Трилистен възел - метод за рисуване
+		TrefoilKnot.prototype.draw = function()
+		{	
+			pushMatrix();
+			translate(this.center);
+			scale([this.size, this.size, this.size]);
+			useMatrix();
+			
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
+			
+			// Позиции (offset 0, 3 floats)
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ, 3, gl.FLOAT, false, 9*FLOATS, 0);
+			
+			// Цветове (offset 3, 3 floats)
+			gl.enableVertexAttribArray(aColor);
+			gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, 9*FLOATS, 3*FLOATS);
+			
+			// Нормали (offset 6, 3 floats)
+			gl.enableVertexAttribArray(aNormal);
+			gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 9*FLOATS, 6*FLOATS);
+			
+			gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
+			
+			popMatrix();
+		}
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			aColor = gl.getAttribLocation(glprog,"aColor");
+			uAmbientColor = gl.getUniformLocation(glprog,"uAmbientColor");
+			uUseAmbient   = gl.getUniformLocation(glprog,"uUseAmbient");
+
+			aNormal = gl.getAttribLocation(glprog,"aNormal");
+			uDiffuseColor = gl.getUniformLocation(glprog,"uDiffuseColor");
+			uUseDiffuse = gl.getUniformLocation(glprog,"uUseDiffuse");
+			uLightDir = gl.getUniformLocation(glprog,"uLightDir");
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0,0,0,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			gl.uniform3f(uAmbientColor,0.4,0.4,0.4);
+			gl.uniform1i(uUseAmbient,true);
+
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform1i(uUseDiffuse,true);
+			
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// Създаваме трилистния възел
+			s = new TrefoilKnot([0,0,0], 1);
+		}
+		
+		var frame = 0;
+	
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([15*Math.sin(frame/100),0,-15*Math.cos(frame/100)], [0,0,0], [0,-1,1]);
+			xRotate(0.5);
+
+			// Рисуване на трилистния възел
+			s.draw();
+
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Възелът</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Вирусът на Безие - Homework 09</title>
+    <script src="webgl-fmi.js"></script>
+    <script src="shaders.js"></script>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <!-- Vertex Shader -->
+    <script id="vShader" type="x-shader/x-vertex">
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uViewMatrix;
+        uniform mat4 uModelMatrix;
+        uniform mat4 uNormalMatrix;
+        uniform bool uUseNormalMatrix;
+        
+        uniform vec3 uAmbientColor;
+        uniform vec3 uDiffuseColor;
+        uniform vec3 uLightDir;
+        
+        attribute vec3 aXYZ;
+        attribute vec3 aColor;
+        attribute vec3 aNormal;
+        
+        varying vec3 vColor;
+        
+        void main() {
+            mat4 mvMatrix = uViewMatrix * uModelMatrix;
+            gl_Position = uProjectionMatrix * mvMatrix * vec4(aXYZ, 1);
+            mat4 nMatrix = uUseNormalMatrix ? uNormalMatrix : mvMatrix;
+            
+            vColor = uAmbientColor * aColor;
+            
+            vec3 light = normalize(-uLightDir);
+            vec3 normal = vec3(normalize(nMatrix * vec4(aNormal, 0)));
+            vColor += aColor * uDiffuseColor * max(dot(normal, light), 0.0);
+        }
+    </script>
+
+    <!-- Fragment Shader -->
+    <script id="fShader" type="x-shader/x-fragment">
+        precision mediump float;
+        varying vec3 vColor;
+        uniform float uAlpha;
+        
+        void main() {
+            gl_FragColor = vec4(vColor, uAlpha);
+        }
+    </script>
+
+    <script>
+        var gl;
+        var virus;
+        var time = 0;
+        
+        // Virus class
+        class Virus {
+            constructor(numSpikes, bodyRadius, spikeLength) {
+                this.numSpikes = numSpikes;
+                this.bodyRadius = bodyRadius;
+                this.spikeLength = spikeLength;
+                this.spikeDirections = [];
+                this.colors = [];
+                
+                // Generate uniformly distributed points on sphere (Fibonacci sphere)
+                var phi = Math.PI * (3 - Math.sqrt(5)); // golden angle
+                for (var i = 0; i < numSpikes; i++) {
+                    var y = 1 - (i / (numSpikes - 1)) * 2;
+                    var radius = Math.sqrt(1 - y * y);
+                    var theta = phi * i;
+                    var x = Math.cos(theta) * radius;
+                    var z = Math.sin(theta) * radius;
+                    this.spikeDirections.push([x, y, z]);
+                    
+                    // Random color for each spike
+                    this.colors.push([
+                        Math.random(),
+                        Math.random(),
+                        Math.random()
+                    ]);
+                }
+                
+                this.body = new Sphere([0, 0, 0], bodyRadius);
+                this.body.color = [1, 1, 1];
+                this.spikes = [];
+                
+                // Create Bezier surface for each spike
+                for (var i = 0; i < numSpikes; i++) {
+                    var dir = this.spikeDirections[i];
+                    var spike = new BezierSpike(dir, bodyRadius, spikeLength);
+                    spike.color = this.colors[i];
+                    this.spikes.push(spike);
+                }
+            }
+            
+            draw(colorMode) {
+                // colorMode: 0 = white body with black tips, 1 = each spike in different color
+                
+                // Draw body
+                pushMatrix();
+                if (colorMode === 0) {
+                    this.body.color = [1, 1, 1];
+                } else {
+                    this.body.color = [0.9, 0.9, 0.9];
+                }
+                this.body.draw();
+                popMatrix();
+                
+                // Draw spikes
+                for (var i = 0; i < this.spikes.length; i++) {
+                    pushMatrix();
+                    if (colorMode === 0) {
+                        // White body with black tips - spike color white, tip black
+                        this.spikes[i].color = [1, 1, 1];
+                        this.spikes[i].tipColor = [0, 0, 0];
+                    } else {
+                        // Each spike in its own color
+                        this.spikes[i].color = this.colors[i];
+                        this.spikes[i].tipColor = this.colors[i];
+                    }
+                    this.spikes[i].draw();
+                    popMatrix();
+                }
+            }
+        }
+        
+        // Bezier Spike class - a spike using Bezier surface
+        class BezierSpike {
+            constructor(direction, baseRadius, length) {
+                this.direction = direction;
+                this.baseRadius = baseRadius;
+                this.length = length;
+                this.color = [1, 1, 1];
+                this.tipColor = [0, 0, 0];
+                
+                // Create rotation matrix to align spike with direction
+                this.rotationMatrix = this.createAlignMatrix(direction);
+                
+                // Create Bezier surface mesh
+                this.createMesh();
+            }
+            
+            createAlignMatrix(dir) {
+                // Align the Y axis to the given direction
+                var up = [0, 1, 0];
+                var d = unitVector(dir);
+                
+                // If direction is parallel to up, use different axis
+                if (Math.abs(scalarProduct(d, up)) > 0.99) {
+                    up = [1, 0, 0];
+                }
+                
+                var right = unitVector(vectorProduct(up, d));
+                up = unitVector(vectorProduct(d, right));
+                
+                return [
+                    right[0], right[1], right[2], 0,
+                    d[0], d[1], d[2], 0,
+                    up[0], up[1], up[2], 0,
+                    0, 0, 0, 1
+                ];
+            }
+            
+            createMesh() {
+                var spikes = [];
+                var normals = [];
+                var colors = [];
+                var indices = [];
+                
+                var segments = 12;
+                var rings = 8;
+                var baseR = this.baseRadius;
+                var len = this.length;
+                
+                // Create vertices using Bezier-like curve
+                for (var ring = 0; ring <= rings; ring++) {
+                    var t = ring / rings;
+                    
+                    // Bezier-like profile: starts at base, curves out, then to tip
+                    // Using cubic Bezier with control points
+                    var profile = this.getBezierProfile(t, baseR, len);
+                    var radius = profile.radius;
+                    var height = profile.height;
+                    
+                    for (var seg = 0; seg <= segments; seg++) {
+                        var theta = (seg / segments) * 2 * Math.PI;
+                        
+                        var x = radius * Math.cos(theta);
+                        var z = radius * Math.sin(theta);
+                        var y = height;
+                        
+                        spikes.push([x, y, z]);
+                        
+                        // Normal (approximate)
+                        var nx = Math.cos(theta);
+                        var nz = Math.sin(theta);
+                        var ny = radius / len * 0.5;
+                        var n = unitVector([nx, ny, nz]);
+                        normals.push(n);
+                        
+                        // Color - interpolate between base and tip
+                        var color = [
+                            this.color[0] * (1 - t) + this.tipColor[0] * t,
+                            this.color[1] * (1 - t) + this.tipColor[1] * t,
+                            this.color[2] * (1 - t) + this.tipColor[2] * t
+                        ];
+                        colors.push(color);
+                    }
+                }
+                
+                // Create indices
+                for (var ring = 0; ring < rings; ring++) {
+                    for (var seg = 0; seg < segments; seg++) {
+                        var a = ring * (segments + 1) + seg;
+                        var b = a + segments + 1;
+                        
+                        indices.push(a, b, a + 1);
+                        indices.push(b, b + 1, a + 1);
+                    }
+                }
+                
+                // Apply rotation to align with direction
+                var rotatedSpikes = [];
+                var rotatedNormals = [];
+                for (var i = 0; i < spikes.length; i++) {
+                    var p = spikes[i];
+                    var rotated = this.transformPoint(p);
+                    rotatedSpikes.push(rotated);
+                    
+                    var n = normals[i];
+                    var rotN = this.transformVector(n);
+                    rotatedNormals.push(rotN);
+                }
+                
+                this.vertexCount = indices.length;
+                
+                // Create buffers
+                this.buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(rotatedSpikes.flat()), gl.STATIC_DRAW);
+                
+                this.normalBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(rotatedNormals.flat()), gl.STATIC_DRAW);
+                
+                this.colorBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors.flat()), gl.STATIC_DRAW);
+                
+                this.indexBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+            }
+            
+            getBezierProfile(t, baseR, len) {
+                // Cubic Bezier curve for spike profile
+                // P0 = (baseR, 0), P1 = (baseR * 1.5, len * 0.3), P2 = (baseR * 0.5, len * 0.7), P3 = (0, len)
+                var p0 = { x: baseR, y: 0 };
+                var p1 = { x: baseR * 1.8, y: len * 0.25 };
+                var p2 = { x: baseR * 0.3, y: len * 0.7 };
+                var p3 = { x: 0, y: len };
+                
+                var u = 1 - t;
+                var tt = t * t;
+                var uu = u * u;
+                var uuu = uu * u;
+                var ttt = tt * t;
+                
+                var x = uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x;
+                var y = uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y;
+                
+                return { radius: x, height: y };
+            }
+            
+            transformPoint(p) {
+                var m = this.rotationMatrix;
+                return [
+                    m[0] * p[0] + m[4] * p[1] + m[8] * p[2],
+                    m[1] * p[0] + m[5] * p[1] + m[9] * p[2],
+                    m[2] * p[0] + m[6] * p[1] + m[10] * p[2]
+                ];
+            }
+            
+            transformVector(v) {
+                var m = this.rotationMatrix;
+                return [
+                    m[0] * v[0] + m[4] * v[1] + m[8] * v[2],
+                    m[1] * v[0] + m[5] * v[1] + m[9] * v[2],
+                    m[2] * v[0] + m[6] * v[1] + m[10] * v[2]
+                ];
+            }
+            
+            draw() {
+                // Use pushMatrix/popMatrix for proper matrix handling
+                pushMatrix();
+                
+                // Use vertex colors from buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                gl.enableVertexAttribArray(aXYZ);
+                gl.vertexAttribPointer(aXYZ, 3, gl.FLOAT, false, 0, 0);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+                gl.enableVertexAttribArray(aNormal);
+                gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
+                gl.enableVertexAttribArray(aColor);
+                gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, 0, 0);
+                
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+                gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
+                
+                popMatrix();
+            }
+        }
+        
+        function start() {
+            gl = getContext("canvas");
+            
+            glprog = getProgram("vShader", "fShader");
+            getVariables();
+            
+            gl.enable(gl.DEPTH_TEST);
+            gl.clearColor(0.1, 0.1, 0.15, 1);
+            
+            // Initialize matrix - this is required by the library
+            identity();
+            
+            // Create virus with 60 spikes
+            virus = new Virus(60, 1.5, 1.2);
+            
+            gl.uniform3f(uAmbientColor, 0.3, 0.3, 0.35);
+            gl.uniform3f(uDiffuseColor, 0.8, 0.8, 0.8);
+            gl.uniform3f(uLightDir, 0.5, 0.5, 1);
+            gl.uniform1f(uAlpha, 1.0);
+            
+            requestAnimationFrame(draw);
+        }
+        
+        function draw() {
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            var aspect = gl.canvas.width / gl.canvas.height;
+            perspective(45, aspect, 1, 100);
+            
+            // Camera orbiting around the virus
+            time += 0.005;
+            var camDist = 8;
+            var camX = Math.sin(time) * camDist;
+            var camZ = Math.cos(time) * camDist;
+            var camY = Math.sin(time * 0.5) * 2;
+            
+            lookAt([camX, camY, camZ], [0, 0, 0], [0, 1, 0]);
+            
+            // Determine color mode based on time (switch every 3 seconds)
+            var colorMode = Math.floor(time / 3) % 2;
+            
+            // Slow rotation of the virus
+            pushMatrix();
+            identity();
+            yRotate(time * 20);
+            xRotate(time * 10);
+            useMatrix();
+            
+            virus.draw(colorMode);
+            
+            popMatrix();
+            
+            requestAnimationFrame(draw);
+        }
+        
+        window.onload = start;
+        window.onresize = function() {
+            if (!gl) return;
+            gl.canvas.width = window.innerWidth;
+            gl.canvas.height = window.innerHeight;
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        };
+        window.onresize();
+    </script>
+</body>
+</html>

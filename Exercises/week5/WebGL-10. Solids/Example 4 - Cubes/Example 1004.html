@@ -1,0 +1,258 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Кубове</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		
+		uniform bool uUseAmbient;
+		uniform vec3 uAmbientColor;
+
+		uniform bool uUseDiffuse;
+		uniform vec3 uDiffuseColor;
+
+		uniform vec3 uLightDir;
+		
+		attribute vec3 aXYZ;
+		attribute vec3 aColor;
+		attribute vec3 aNormal;
+
+		varying vec3 vColor;
+		
+		void main ()
+		{
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			gl_Position = uProjectionMatrix * mvMatrix * vec4(aXYZ,1);
+
+			// околна светлина
+			if (uUseAmbient)
+				vColor = uAmbientColor*aColor;
+			else
+				vColor = aColor;
+
+			// дифузно отражение
+			if (uUseDiffuse)
+			{
+				vec3 light = normalize(-uLightDir);
+				vec3 normal = vec3(normalize(mvMatrix*vec4(aNormal,0)));
+				vColor += aColor*uDiffuseColor*max(dot(normal,light),0.0);
+			}
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vColor;
+		void main( )
+		{
+			gl_FragColor = vec4(vColor,1);
+		}
+	</script>
+
+	<script>
+		// каноничен куб - конструктор
+		CanonicalCube = function()
+		{	
+			// върхове
+			var v = [ [+0.5,-0.5,-0.5], [+0.5,+0.5,-0.5],
+				 	  [-0.5,+0.5,-0.5], [-0.5,-0.5,-0.5],
+					  [+0.5,-0.5,+0.5], [+0.5,+0.5,+0.5],
+					  [-0.5,+0.5,+0.5], [-0.5,-0.5,+0.5] ];
+			// нормални вектори
+			var n = [ [1,0,0], [-1,0,0],
+				 	  [0,1,0], [0,-1,0],
+					  [0,0,1], [0,0,-1] ];
+			// общ списък връх-нормала
+			var data = [].concat(
+					  v[0],n[0],v[1],n[0],v[4],n[0],
+					  v[4],n[0],v[1],n[0],v[5],n[0],
+					  v[6],n[1],v[2],n[1],v[7],n[1],
+					  v[7],n[1],v[2],n[1],v[3],n[1],
+					  v[5],n[2],v[1],n[2],v[6],n[2],
+					  v[6],n[2],v[1],n[2],v[2],n[2],
+					  v[4],n[3],v[7],n[3],v[0],n[3],
+					  v[0],n[3],v[7],n[3],v[3],n[3],
+					  v[4],n[4],v[5],n[4],v[7],n[4],
+					  v[7],n[4],v[5],n[4],v[6],n[4],
+					  v[0],n[5],v[3],n[5],v[1],n[5],
+					  v[1],n[5],v[3],n[5],v[2],n[5] );
+			// локална променлива за инстацията с WebGL буфер
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			// запомняме буфера в текущата инстанция
+			this.buf = buf;
+		}
+
+		// каноничен куб - метод за рисуване
+		CanonicalCube.prototype.draw = function()
+		{	
+			// активираме буфера, създаден от конструктора
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			// казваме къде са координатите
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,6*FLOATS,0*FLOATS);
+			// казваме къде са нормалите
+			gl.enableVertexAttribArray(aNormal);
+			gl.vertexAttribPointer(aNormal,3,gl.FLOAT,false,6*FLOATS,3*FLOATS);
+			// рисуваме
+			gl.drawArrays(gl.TRIANGLES,0,36);
+		}
+
+		var canonicalCube;
+		
+		// куб - конструктор с параметри център и размер
+		Cube = function(center,size)
+		{
+			// съхраняваме центъра и размера на куба
+			this.center = center;
+			this.size = size;
+			this.color = [1,0.75,0];
+			// създаваме еднократно канонична инстанция
+			if (!canonicalCube)
+				canonicalCube = new CanonicalCube();
+		}
+		
+		// куб - рисуване
+		Cube.prototype.draw = function()
+		{
+			pushMatrix(); // запомняме матрицата
+			gl.vertexAttrib3fv(aColor,this.color); // подаваме цвета
+			translate(this.center); // мястото
+			scale([this.size,this.size,this.size]); // и размера
+			useMatrix();
+			canonicalCube.draw(); // самото рисуване
+			popMatrix(); // възстановяваме матрицата
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			aColor = gl.getAttribLocation(glprog,"aColor");
+			uAmbientColor = gl.getUniformLocation(glprog,"uAmbientColor");
+			uUseAmbient   = gl.getUniformLocation(glprog,"uUseAmbient");
+
+			aNormal = gl.getAttribLocation(glprog,"aNormal");
+			uDiffuseColor = gl.getUniformLocation(glprog,"uDiffuseColor");
+			uUseDiffuse = gl.getUniformLocation(glprog,"uUseDiffuse");
+			uLightDir = gl.getUniformLocation(glprog,"uLightDir");
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.7,0.7,0.7,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			gl.uniform3f(uAmbientColor,0.4,0.4,0.4);
+			gl.uniform1i(uUseAmbient,true);
+
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform1i(uUseDiffuse,true);
+			
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// създаване на куб от кубове
+			// първо големите кубове по върховете
+			c000 = new Cube([-1,-1,-1],1); c000.color=[0,0,0];
+			c001 = new Cube([-1,-1,+1],1); c001.color=[0,0,1];
+			c011 = new Cube([-1,+1,+1],1); c011.color=[0,1,1];
+			c010 = new Cube([-1,+1,-1],1); c010.color=[0,1,0];
+
+			c100 = new Cube([+1,-1,-1],1); c100.color=[1,0,0];
+			c101 = new Cube([+1,-1,+1],1); c101.color=[1,0,1];
+			c111 = new Cube([+1,+1,+1],1); c111.color=[1,1,1];
+			c110 = new Cube([+1,+1,-1],1); c110.color=[1,1,0];
+
+			// после малките кубове по ръбовете
+			c00x = new Cube([-1,-1, 0],2/3); c00x.color=[0,0,0.5];
+			c0x1 = new Cube([-1, 0,+1],2/3); c0x1.color=[0,0.5,1];
+			c01x = new Cube([-1,+1, 0],2/3); c01x.color=[0,1,0.5];
+			c0x0 = new Cube([-1, 0,-1],2/3); c0x0.color=[0,0.5,0];
+
+			c10x = new Cube([+1,-1, 0],2/3); c10x.color=[1,0,0.5];
+			c1x1 = new Cube([+1, 0,+1],2/3); c1x1.color=[1,0.5,1];
+			c11x = new Cube([+1,+1, 0],2/3); c11x.color=[1,1,0.7];
+			c1x0 = new Cube([+1, 0,-1],2/3); c1x0.color=[1,0.5,0];
+
+			cx00 = new Cube([ 0,-1,-1],2/3); cx00.color=[0.5,0,0];
+			cx01 = new Cube([ 0,-1,+1],2/3); cx01.color=[0.5,0,1];
+			cx11 = new Cube([ 0,+1,+1],2/3); cx11.color=[0.7,1,1];
+			cx10 = new Cube([ 0,+1,-1],2/3); cx10.color=[0.7,1,0];
+		}
+		
+		var frame = 0;
+	
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([10*Math.cos(frame/100),10*Math.sin(frame/100),1], [0,0,0], [0,0,1]);
+			yRotate(0.5);
+
+			// рисуване на кубовете
+			c000.draw();
+			c001.draw();
+			c011.draw();
+			c010.draw();
+
+			c100.draw();
+			c101.draw();
+			c111.draw();
+			c110.draw();
+			
+			c00x.draw();
+			c0x1.draw();
+			c01x.draw();
+			c0x0.draw();
+
+			c10x.draw();
+			c1x1.draw();
+			c11x.draw();
+			c1x0.draw();
+
+			cx00.draw();
+			cx01.draw();
+			cx11.draw();
+			cx10.draw();
+
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Кубове</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

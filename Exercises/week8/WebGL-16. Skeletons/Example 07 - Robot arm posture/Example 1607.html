@@ -1,0 +1,138 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Поза на роботска ръка</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// става и кост - конструктор
+		Bone = function(size)
+		{	
+			this.bone = new Cuboid([0,0,0],size);
+			this.bone.color = [0.5,0.8,0.5];
+			this.bone.offset = [0,0,0.5];
+			this.rot = [0,0,0];
+		}
+
+		// става и кост - метод за рисуване
+		Bone.prototype.draw = function()
+		{	
+			if (this.rot)
+			{
+				if (this.rot[0]) zRotate(this.rot[0]);	// хоризонтален ъгъл
+				if (this.rot[1]) xRotate(this.rot[1]);	// вертикален ъгъл
+				if (this.rot[2]) zRotate(this.rot[2]);	// осев ъгъл
+			}
+			this.bone.draw();
+			translate([0,0,this.bone.size[2]]); // преместване в края на костта
+		}
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.7,0.7,0.7,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// платформа
+			platform = new Prism([0,0,-1],15,1,8);
+			ball1 = new Sphere([8,7,2],2);
+			ball2 = new Sphere([-6,6,10],1);
+			ball3 = new Sphere([0,-10,4],4);
+			
+			// дефиниране на сегментите
+			n = 6;
+			bone = [];
+			for (var i=0; i<n-2; i++)
+			{
+				var k = Math.pow(0.8,i); // коефициент на смаляване на размерите
+				bone[i] = new Bone( [4*k,1*k,9*k] );
+			}
+			bone[4] = new Bone(bone[2].bone.size);
+			bone[5] = new Bone(bone[3].bone.size);
+			
+			// пози на ръката
+			posture = [];
+			posture[0] = [[0, 24, 0], [0, -135, 0], [-90, 48, 0], [0, -51, 0], [-90, -48, 0], [0, 51, 0]];
+			posture[1] = [[135, 54, 0], [0, -126, 0], [-129, 27, 0], [0, -48, 0], [-129, -27, 0], [0, 48, 0]];
+			posture[2] = [[-132, 6, 0], [0, -126, 0], [-81, 54, 0], [0, -93, 0], [-81, -54, 0], [0, 93, 0]];
+		}
+
+		var time;
+		function now() { return (new Date()).getTime()/1000; }
+
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([75*cos(time/5),75*sin(time/5),20],[0,0,13],[0,0,1]);
+
+			// рисуване на платформата и топките
+			platform.draw();
+			ball1.draw();
+			ball2.draw();
+			ball3.draw();
+			
+			// рисуване на роботската ръка
+			pushMatrix();
+			bone[0].draw();
+			bone[1].draw();
+				pushMatrix(); // запомняме ориентацията в края на кост 1
+				bone[2].draw();
+				bone[3].draw();
+				popMatrix(); // връщаме запомнената ориентацията
+				bone[4].draw();
+				bone[5].draw();
+			popMatrix();
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// променяне на поза
+		function setPosture(p)
+		{
+			for (var i=0; i<n; i++)
+				bone[i].rot = posture[p][i];
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Поза на роботска ръка</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="setPosture(0)">Поза 1</button>
+	<button onclick="setPosture(1)">Поза 2</button>
+	<button onclick="setPosture(2)">Поза 3</button>
+</body>
