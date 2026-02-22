@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Осветяване на Гурò</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		
+		uniform bool uUseAmbient;
+		uniform vec3 uAmbientColor;
+
+		uniform bool uUseDiffuse;
+		uniform vec3 uDiffuseColor;
+
+		uniform vec3 uLightDir;
+		
+		attribute vec3 aXYZ;
+		attribute vec3 aColor;
+		attribute vec3 aNormal;
+
+		varying vec3 vColor;
+		
+		void main ()
+		{
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			gl_Position = uProjectionMatrix * mvMatrix * vec4(aXYZ,1);
+
+			// околна светлина
+			if (uUseAmbient)
+				vColor = uAmbientColor*aColor;
+			else
+				vColor = aColor;
+
+			// дифузно отражение
+			if (uUseDiffuse)
+			{
+				vec3 light = vec3(normalize(-uLightDir));
+				vec3 normal = vec3(normalize(mvMatrix*vec4(aNormal,0)));
+				vColor += aColor*uDiffuseColor*max(dot(normal,light),0.0);
+			}
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec3 vColor;
+		void main( )
+		{
+			gl_FragColor = vec4(vColor,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+
+		var k = 40;
+		function surface(x,y)
+		{
+			var r=Math.sqrt(x*x+y*y);
+			return 10*Math.cos(r/5)*Math.cos(r/10)*Math.cos(r/20);
+		}
+
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			aColor = gl.getAttribLocation(glprog,"aColor");
+			uAmbientColor = gl.getUniformLocation(glprog,"uAmbientColor");
+			uUseAmbient   = gl.getUniformLocation(glprog,"uUseAmbient");
+
+			aNormal = gl.getAttribLocation(glprog,"aNormal");
+			uDiffuseColor = gl.getUniformLocation(glprog,"uDiffuseColor");
+			uUseDiffuse = gl.getUniformLocation(glprog,"uUseDiffuse");
+
+			uLightDir = gl.getUniformLocation(glprog,"uLightDir");
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+		
+			var p=[];	// масив с върхове
+			var n=[];	// масив с нормалния вектор във всеки връх
+			
+			// изчисляваме височината във възлите
+			for (var x=-k; x<=k; x++)
+			{
+				p[x]=[];
+				for (var y=-k; y<=k; y++)
+					p[x][y] = [x,y,surface(x,y)];
+			}
+			
+			// изчисляваме нормалните вектори във възлите
+			var eps = 0.01;
+			for (var x=-k; x<=k; x++)
+			{
+				n[x]=[];
+				for (var y=-k; y<=k; y++)
+				{
+					var p0 = [x,y,surface(x,y)];
+					var p1 = [x-eps,y,surface(x-eps,y)];
+					var p2 = [x,y-eps,surface(x,y-eps)];
+					n[x][y]=unitVector(vectorProduct(vectorPoints(p1,p0),vectorPoints(p2,p0)));
+				}
+			}
+
+			// генерираме триъгълниците: координати на върхове и нормали
+			// на върховете на всеки триъгълник слагаме неговата си нормала
+			var data = [];
+			dataPush = function(a) {data.push(a[0],a[1],a[2]);};
+			for (var x=-k; x<k; x++)
+				for (var y=-k; y<k; y++)
+				{
+					// първи триъгълник
+					dataPush(p[x  ][y  ]); dataPush(n[x  ][y  ]);
+					dataPush(p[x+1][y  ]); dataPush(n[x+1][y  ]);
+					dataPush(p[x  ][y+1]); dataPush(n[x  ][y+1]);
+
+					// втори триъгълник
+					dataPush(p[x  ][y+1]); dataPush(n[x  ][y+1]);
+					dataPush(p[x+1][y  ]); dataPush(n[x+1][y  ]);
+					dataPush(p[x+1][y+1]); dataPush(n[x+1][y+1]);
+				}
+				
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			
+			// включване на върховете
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,6*FLOATS,0*FLOATS);
+
+			// включване на нормалните вектори
+			gl.enableVertexAttribArray(aNormal);
+			gl.vertexAttribPointer(aNormal,3,gl.FLOAT,false,6*FLOATS,3*FLOATS);
+
+			// цвят на повърхността, на фоновата светлина и на дифузната светлина
+			gl.vertexAttrib3f(aColor,0.5,0.5,0.5);
+			gl.uniform3f(uAmbientColor,0.5,0.3,0);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			gl.uniform1i(uUseAmbient,true);
+			gl.uniform1i(uUseDiffuse,true);
+		}
+		
+		var frame = 0;
+	
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			var dist = 50+40*Math.sin(frame/50);
+			lookAt([dist*Math.cos(frame/310),dist*Math.sin(frame/180),100-dist], [0.1,-0.1,0], [0,0,1]);
+
+			useMatrix();
+			gl.drawArrays(gl.TRIANGLES,0,(2*k)*(2*k)*(2*3));
+	
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Осветяване на Гурò</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

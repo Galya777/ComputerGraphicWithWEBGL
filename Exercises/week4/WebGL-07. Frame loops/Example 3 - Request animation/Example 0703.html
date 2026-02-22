@@ -1,0 +1,126 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Заявка за анимация</title>
+
+	<script src="webgl-fmi.js"></script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		void main( )
+		{
+			gl_FragColor = vec4(1,0,0,1);
+		}
+	</script>
+
+	<script>
+		var animateId = 0; // номер на заявката за анимация
+
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			gl.clearColor(1,1,1,1);
+
+			var proj = perspMatrix(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			identity();
+			scale([3,3,3]);
+			useMatrix();
+			
+			// куб 1x1x1
+			var data = [ 0.5,-0.5,0.5,	// предна стена
+						 0.5,0.5,0.5,
+						-0.5,0.5,0.5,
+						-0.5,-0.5,0.5,
+						 0.5,-0.5,-0.5, // задна стена
+						 0.5,0.5,-0.5,
+						-0.5,0.5,-0.5,
+						-0.5,-0.5,-0.5,
+						
+						 0.5,-0.5,0.5, // десни хоризонтални ръбове
+						 0.5,-0.5,-0.5,
+						 0.5,0.5,0.5,
+						 0.5,0.5,-0.5,
+						-0.5,0.5,0.5,	// леви хоризонтални ръбове
+						-0.5,0.5,-0.5,
+						-0.5,-0.5,0.5,
+						-0.5,-0.5,-0.5	];
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+			
+			drawFrame();
+		}
+		
+		var frame = 0;
+
+		function drawFrame()
+		{
+			frame++;
+			
+			var view = viewMatrix([10*Math.cos(frame/100),10*Math.sin(frame/100),2], [0,0,0], [0,0,1]);
+			gl.uniformMatrix4fv(uViewMatrix,false,view);
+
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			gl.drawArrays(gl.LINE_LOOP,0,4);
+			gl.drawArrays(gl.LINE_LOOP,4,4);
+			gl.drawArrays(gl.LINES,8,8);
+
+			if (animateId) animateId = requestAnimationFrame(drawFrame);
+		}
+
+		
+		
+		// пуска анимацията, ако е спряна
+		function startAnimation()
+		{
+			if (!animateId) animateId = requestAnimationFrame(drawFrame);
+		}
+		
+		// спира анимацията, ако е пусната
+		function stopAnimation()
+		{
+			//if (animateId) cancelAnimationFrame(animateId);
+			animateId = 0;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Заявка за анимация</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+
+	<p>
+		<button onclick="JavaScript:startAnimation()">Старт</button>
+		<button onclick="JavaScript:stopAnimation()">Стоп</button>
+	</p>
+</body>

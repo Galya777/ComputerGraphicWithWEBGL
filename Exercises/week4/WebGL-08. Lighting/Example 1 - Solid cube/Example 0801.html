@@ -1,0 +1,105 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Плътен куб</title>
+
+	<script src="webgl-fmi.js"></script>
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		attribute vec3 aXYZ;
+		void main ()
+		{
+			gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aXYZ,1);
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		void main( )
+		{
+			gl_FragColor = vec4(1,0,0,1);
+		}
+	</script>
+
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+
+		// рисуване на куб като множество от 12 триъгълника
+		function drawCube()
+		{
+			useMatrix();
+			gl.drawArrays(gl.TRIANGLES,0,36);
+		}
+
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader","fshader");
+
+			
+			aXYZ = gl.getAttribLocation(glprog,"aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog,"uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog,"uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog,"uModelMatrix");
+
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+
+			// куб 1x1x1
+			// за удобство - масив v от 8-те върха
+			var v = [ [+0.5,-0.5,-0.5], [+0.5,+0.5,-0.5],
+				 	  [-0.5,+0.5,-0.5], [-0.5,-0.5,-0.5],
+					  [+0.5,-0.5,+0.5], [+0.5,+0.5,+0.5],
+					  [-0.5,+0.5,+0.5], [-0.5,-0.5,+0.5] ];
+			// описание на върховете на 12 триъгълника на куб - по 2 на стена
+			var data = [].concat(
+					  v[0],v[1],v[4], v[4],v[1],v[5], v[6],v[2],v[7], v[7],v[2],v[3],
+					  v[5],v[1],v[6], v[6],v[1],v[2], v[4],v[7],v[0], v[0],v[7],v[3], 
+					  v[4],v[5],v[7], v[7],v[5],v[6], v[0],v[3],v[1], v[1],v[3],v[2] );
+
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,0,0);
+		}
+		
+		var frame = 0;
+	
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			lookAt([4*Math.cos(frame/100),4*Math.sin(frame/100),1], [0,0,0], [0,0,1]);
+			drawCube(frame);
+
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Плътен куб</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Вълнàта</title>
+
+	<script src="webgl-fmi.js">
+	</script>	
+	
+	<script id="vshader" type="x-shader/x-vertex">
+		uniform mat4 uProjectionMatrix;
+		uniform mat4 uViewMatrix;
+		uniform mat4 uModelMatrix;
+		
+		uniform bool uUseAmbient;
+		uniform vec3 uAmbientColor;
+
+		uniform bool uUseDiffuse;
+		uniform vec3 uDiffuseColor;
+
+		uniform vec3 uLightDir;
+		
+		uniform float uTime;
+		
+		attribute vec3 aXYZ;
+		attribute vec3 aColor;
+		attribute vec3 aNormal;
+
+		varying vec3 vNormal;
+		varying vec3 vColor;
+		varying vec3 vPos;
+		
+		float waveHeight(float x, float y, float time)
+		{
+			float r = sqrt(x*x + y*y);
+			return 3.0 * pow(abs(cos(r/4.0 - time/5.0)), 6.0);
+		}
+		
+		void main ()
+		{
+			float h = waveHeight(aXYZ.x, aXYZ.y, uTime);
+			vec3 pos = vec3(aXYZ.x, aXYZ.y, h);
+			
+			mat4 mvMatrix = uViewMatrix * uModelMatrix;
+			vec4 mvPos = mvMatrix * vec4(pos, 1);
+			gl_Position = uProjectionMatrix * mvPos;
+
+			float eps = 0.1;
+			float hx = waveHeight(aXYZ.x + eps, aXYZ.y, uTime);
+			float hy = waveHeight(aXYZ.x, aXYZ.y + eps, uTime);
+			vec3 tangentX = normalize(vec3(eps, 0.0, hx - h));
+			vec3 tangentY = normalize(vec3(0.0, eps, hy - h));
+			vec3 normal = normalize(cross(tangentX, tangentY));
+			
+			vColor = aColor;
+			if (uUseAmbient)
+				vColor *= uAmbientColor;
+			
+			vec3 normalMat = vec3(normalize(mvMatrix * vec4(normal, 0)));
+			vec3 light = normalize(-uLightDir);
+			if (uUseDiffuse)
+				vColor += aColor * uDiffuseColor * max(dot(normalMat, light), 0.0);
+
+			vPos = mvPos.xyz / mvPos.w;
+			vNormal = normalMat;
+		}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+		precision mediump float;
+
+		uniform highp vec3 uLightDir;
+		uniform bool uUseSpecular;
+		uniform vec3 uSpecularColor;
+		uniform float uShininess;
+
+		varying vec3 vNormal;
+		varying vec3 vColor;
+		varying vec3 vPos;
+
+		void main( )
+		{
+			vec3 specularColor = vec3(0);
+			
+			if (uUseSpecular)
+			{
+				vec3 light = normalize(-uLightDir);
+				vec3 reflectedLight = normalize(reflect(light, normalize(vNormal)));
+				vec3 viewDir = normalize(vPos);
+
+				float cosa = max(dot(reflectedLight, viewDir), 0.0);
+				specularColor = uSpecularColor * pow(cosa, uShininess);
+			}
+
+			gl_FragColor = vec4(vColor + specularColor, 1);
+		}
+	</script>
+
+	<script>
+		var k = 40; 
+		
+		var waveColor = {r: 0.55, g: 0.35, b: 0.2};
+		var colorMode = 'chocolate'; // текущ режим на цвета
+		
+		function start()
+		{
+			var canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost', function(event){event.preventDefault();}, false);
+			canvas.addEventListener('webglcontextrestored', function(){init();}, false);
+
+			init();
+			drawFrame();
+		}
+		
+
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram("vshader", "fshader");
+
+			aXYZ = gl.getAttribLocation(glprog, "aXYZ");
+			uProjectionMatrix = gl.getUniformLocation(glprog, "uProjectionMatrix");
+			uViewMatrix = gl.getUniformLocation(glprog, "uViewMatrix");
+			uModelMatrix = gl.getUniformLocation(glprog, "uModelMatrix");
+			uTime = gl.getUniformLocation(glprog, "uTime");
+			
+			aColor = gl.getAttribLocation(glprog, "aColor");
+			uAmbientColor = gl.getUniformLocation(glprog, "uAmbientColor");
+			uUseAmbient = gl.getUniformLocation(glprog, "uUseAmbient");
+
+			aNormal = gl.getAttribLocation(glprog, "aNormal");
+
+			uDiffuseColor = gl.getUniformLocation(glprog, "uDiffuseColor");
+			uUseDiffuse = gl.getUniformLocation(glprog, "uUseDiffuse");
+
+			uSpecularColor = gl.getUniformLocation(glprog, "uSpecularColor");
+			uUseSpecular = gl.getUniformLocation(glprog, "uUseSpecular");
+
+			uLightDir = gl.getUniformLocation(glprog, "uLightDir");
+			uShininess = gl.getUniformLocation(glprog, "uShininess");
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1, 1, 1, 1);
+
+			identity();
+			perspective(30, gl.canvas.width / gl.canvas.height, 1, 40000);
+
+			var data = [];
+			for (var x = -k; x < k; x++)
+				for (var y = -k; y < k; y++)
+				{
+					data.push(x, y, 0);
+					data.push(x + 1, y, 0);
+					data.push(x, y + 1, 0);
+
+					data.push(x, y + 1, 0);
+					data.push(x + 1, y, 0);
+					data.push(x + 1, y + 1, 0);
+				}
+
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ, 3, gl.FLOAT, false, 0, 0);
+
+			updateColor();
+			
+			gl.uniform3f(uAmbientColor, 0.5, 0.5, 0.5);
+			gl.uniform3f(uDiffuseColor, 1, 1, 1);
+			gl.uniform3f(uSpecularColor, 1, 1, 1);
+			gl.uniform1f(uShininess, 20);
+
+			gl.uniform3f(uLightDir, 0, 0, -1);
+			
+			gl.uniform1i(uUseAmbient, true);
+			gl.uniform1i(uUseDiffuse, true);
+			gl.uniform1i(uUseSpecular, true);
+		}
+		
+		var frame = 0;
+	
+		function drawFrame()
+		{
+			frame++;
+			gl.clear(gl.COLOR_BUFFER_BIT + gl.DEPTH_BUFFER_BIT);
+
+			var dist = 80 + 37 * Math.sin(frame / 100);
+			var d = 0.6 + 0.3 * Math.sin(frame / 200);
+			lookAt([dist * Math.cos(frame / 300) * d, dist * Math.sin(frame / 300) * d, (140 - dist) * d], [0.1, -0.1, 0], [0, 0, 1]);
+
+			gl.uniform1f(uTime, frame);
+
+			// ако сме в режим "НИН" - обновяваме цвета всяка рамка
+			if (colorMode === 'rainbow') {
+				updateRainbowColor(frame);
+			}
+			
+			useMatrix();
+			gl.drawArrays(gl.TRIANGLES, 0, (2 * k) * (2 * k) * 2 * 3);
+	
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// функция за изчисляване на преливащ цвят
+		function updateRainbowColor(frame)
+		{
+			// НИН - преливане между няколко цвята
+			var t = frame * 0.01;
+			
+			// 5 цвята: шоколад, бял, розов, зелен, син
+			var r = 0, g = 0, b = 0;
+			
+			// Синusoидално преливане между 5 цвята
+			var phase = t % 5;
+			var i = Math.floor(phase);
+			var f = phase - i; // фракция между двата цвята
+			
+			// Дефинираме 5 цвята
+			var colors = [
+				{r: 0.55, g: 0.35, b: 0.2},  // шоколад
+				{r: 0.95, g: 0.92, b: 0.85}, // бял
+				{r: 0.9, g: 0.6, b: 0.7},    // розов
+				{r: 0.3, g: 0.8, b: 0.5},    // зелен
+				{r: 0.3, g: 0.5, b: 0.9}     // син
+			];
+			
+			var c1 = colors[i % 5];
+			var c2 = colors[(i + 1) % 5];
+			
+			// Линейна интерполация
+			r = c1.r + (c2.r - c1.r) * f;
+			g = c1.g + (c2.g - c1.g) * f;
+			b = c1.b + (c2.b - c1.b) * f;
+			
+			gl.vertexAttrib3f(aColor, r, g, b);
+		}
+		
+		function updateColor()
+		{
+			gl.vertexAttrib3f(aColor, waveColor.r, waveColor.g, waveColor.b);
+		}
+		
+		function setColor(colorName)
+		{
+			colorMode = colorName;
+			
+			if (colorName === 'chocolate')
+			{
+				waveColor = {r: 0.55, g: 0.35, b: 0.2};
+				updateColor();
+			}
+			else if (colorName === 'white')
+			{
+				waveColor = {r: 0.95, g: 0.92, b: 0.85};
+				updateColor();
+			}
+			else if (colorName === 'dark')
+			{
+				waveColor = {r: 0.25, g: 0.15, b: 0.1};
+				updateColor();
+			}
+			else if (colorName === 'pink')
+			{
+				waveColor = {r: 0.9, g: 0.6, b: 0.7};
+				updateColor();
+			}
+			// 'rainbow' не изисква статичен цвят - той се обновява в drawFrame
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Вълнàта</h2>
+	<p>Изберете цвят:
+		<button onclick="setColor('chocolate')">Млечен шоколад</button>
+		<button onclick="setColor('white')">Бял шоколад</button>
+		<button onclick="setColor('dark')">Тъмен шоколад</button>
+		<button onclick="setColor('pink')">Розов шоколад</button>
+		<button onclick="setColor('rainbow')">🌈 НИН</button>
+	</p>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>
