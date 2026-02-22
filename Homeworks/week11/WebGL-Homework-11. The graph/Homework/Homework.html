@@ -1,8 +1,5 @@
 ﻿<!DOCTYPE html>
 
-<!-- Ами това е началният код. Няма почти нищо в него, затова
-го напълнете с каквото счетете за подходящо. -->
-
 <head>
 	<meta charset="utf-8"/>
 	<title>Графиката</title>
@@ -11,36 +8,270 @@
 	<script src="shaders.js"></script>
 
 	<style>
+		body {
+			margin: 0;
+			overflow: hidden;
+			background: #222;
+		}
 		canvas {
 			display: block;
+			width: 100vw;
+			height: 100vh;
+		}
+		.controls {
 			position: fixed;
-			left: 2em;
-			top: 2em;
-			margin: auto;
-			width: calc(100% - 4em);
-			height: calc(100% - 4em);
-			box-shadow: 0px 0px 6em DarkBlue;
+			top: 10px;
+			left: 10px;
+			color: white;
+			font-family: monospace;
+			background: rgba(0,0,0,0.7);
+			padding: 10px;
+			border-radius: 5px;
+		}
+		.controls label {
+			display: block;
+			margin: 5px 0;
+		}
+		.controls input {
+			width: 200px;
 		}
 	</style>
 
 	<script>
-		function start( )
+		// Дефиниции на функции
+		var functions = [
+			{ name: "sin(x)", f: function(x) { return Math.sin(x); }, color: [1, 0, 0] },
+			{ name: "cos(x)", f: function(x) { return Math.cos(x); }, color: [0, 1, 0] },
+			{ name: "sin(x)/x", f: function(x) { return x === 0 ? 1 : Math.sin(x) / x; }, color: [0, 0, 1] },
+			{ name: "x^2", f: function(x) { return x * x * 0.0001; }, color: [1, 1, 0] },
+			{ name: "sqrt(x)", f: function(x) { return Math.sqrt(x) * 0.01; }, color: [1, 0, 1] },
+			{ name: "log(x)", f: function(x) { return Math.log(x) * 0.1; }, color: [0, 1, 1] },
+			{ name: "sin(x^2)", f: function(x) { return Math.sin(x * x * 0.0001); }, color: [1, 0.5, 0] },
+			{ name: "cos(sqrt(x))", f: function(x) { return Math.cos(Math.sqrt(x) * 0.1); }, color: [0.5, 0, 1] }
+		];
+
+		// Брой точки
+		var numPoints = 10000;
+		
+		// Хоризонтален обхват (може да се променя)
+		var xMin = 0;
+		var xMax = 100;
+		
+		// Изчислени данни за всички функции
+		var functionData = [];
+		
+		function start()
 		{
 			gl = getContext("picasso");
-			glprog = getProgram(vShader,fShader);
+			glprog = getProgram(vShader, fShader);
 			getVariables();
+			
+			// Изчисляваме функциите
+			calculateFunctions();
+			
+			// Първоначално рисуване
+			resize();
 			drawFrame();
+		}
+		
+		// Изчислява стойностите на всички функции
+		function calculateFunctions()
+		{
+			functionData = [];
+			
+			for (var fi = 0; fi < functions.length; fi++)
+			{
+				var data = [];
+				var f = functions[fi].f;
+				
+				for (var i = 0; i < numPoints; i++)
+				{
+					// x от 0 до 100
+					var x = (i / (numPoints - 1)) * 100;
+					var y = f(x);
+					data.push([x, y]);
+				}
+				
+				functionData.push(data);
+			}
+		}
+		
+		// Намира мин и макс за всички функции в текущия обхват
+		function getRangeInView()
+		{
+			var yMin = Infinity;
+			var yMax = -Infinity;
+			
+			var startIdx = Math.floor((xMin / 100) * (numPoints - 1));
+			var endIdx = Math.ceil((xMax / 100) * (numPoints - 1));
+			
+			startIdx = Math.max(0, startIdx);
+			endIdx = Math.min(numPoints - 1, endIdx);
+			
+			for (var fi = 0; fi < functionData.length; fi++)
+			{
+				for (var i = startIdx; i <= endIdx; i++)
+				{
+					var y = functionData[fi][i][1];
+					if (!isNaN(y) && isFinite(y))
+					{
+						yMin = Math.min(yMin, y);
+						yMax = Math.max(yMax, y);
+					}
+				}
+			}
+			
+			if (yMin === Infinity) yMin = -1;
+			if (yMax === -Infinity) yMax = 1;
+			
+			// Добавяме малко отстъп
+			var range = yMax - yMin;
+			yMin -= range * 0.1;
+			yMax += range * 0.1;
+			
+			if (yMin === yMax)
+			{
+				yMin -= 1;
+				yMax += 1;
+			}
+			
+			return { yMin: yMin, yMax: yMax };
 		}
 		
 		function drawFrame()
 		{
-			gl.clearColor(0.5+sin(now()),0.5+sin(now()+2*PI/3),0.5+sin(now()+4*PI/3),1);
-			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			gl.clearColor(0.1, 0.1, 0.15, 1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+			
+			// Ортогонална проекция
+			var aspect = gl.canvas.width / gl.canvas.height;
+			orthoMatrix(2, 2 * aspect, -1, 1);
+			
+			var range = getRangeInView();
+			var yMin = range.yMin;
+			var yMax = range.yMax;
+			
+			// Рисуваме всяка функция
+			for (var fi = 0; fi < functionData.length; fi++)
+			{
+				drawFunction(fi, yMin, yMax);
+			}
+			
 			requestAnimationFrame(drawFrame);
 		}
-	</script>	
+		
+		// Рисува една функция
+		function drawFunction(fi, yMin, yMax)
+		{
+			var data = functionData[fi];
+			var color = functions[fi].color;
+			
+			var vertices = [];
+			
+			var startIdx = Math.floor((xMin / 100) * (numPoints - 1));
+			var endIdx = Math.ceil((xMax / 100) * (numPoints - 1));
+			
+			startIdx = Math.max(0, startIdx);
+			endIdx = Math.min(numPoints - 1, endIdx);
+			
+			// Създаваме линия
+			for (var i = startIdx; i <= endIdx; i++)
+			{
+				var x = data[i][0];
+				var y = data[i][1];
+				
+				// Нормализираме към -1..1
+				var nx = ((x - xMin) / (xMax - xMin)) * 2 - 1;
+				var ny = ((y - yMin) / (yMax - yMin)) * 2 - 1;
+				
+				vertices.push(nx, ny, 0);
+			}
+			
+			// Създаваме буфер
+			var buffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+			
+			// Подаваме атрибути
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ, 3, gl.FLOAT, false, 0, 0);
+			
+			// Цвят - създаваме постоянен цвят за всички вертекси
+			var colors = [];
+			for (var i = 0; i < vertices.length / 3; i++)
+			{
+				colors.push(color[0], color[1], color[2]);
+			}
+			var colorBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.DYNAMIC_DRAW);
+			gl.enableVertexAttribArray(aColor);
+			gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, 0, 0);
+			
+			// Рисуваме линията
+			gl.lineWidth(2);
+			gl.drawArrays(gl.LINE_STRIP, 0, vertices.length / 3);
+			
+			// Изтриваме буферите
+			gl.deleteBuffer(buffer);
+			gl.deleteBuffer(colorBuffer);
+		}
+		
+		function now() { return (new Date()).getTime() / 1000; }
+		
+		// Промяна на размера на прозореца
+		function resize()
+		{
+			gl.canvas.width = window.innerWidth;
+			gl.canvas.height = window.innerHeight;
+			gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+		}
+		
+		window.onload = start;
+		window.onresize = resize;
+		
+		// Интерактивни контроли
+		function setRange(min, max)
+		{
+			xMin = min;
+			xMax = max;
+		}
+	</script>
 </head>
 
-<body onload="start()">
+<body>
+	<div class="controls">
+		<h3>Графика на функции</h3>
+		<label>X мин: <span id="xMinVal">0</span></label>
+		<input type="range" id="xMin" min="0" max="90" value="0" oninput="updateRange()">
+		
+		<label>X макс: <span id="xMaxVal">100</span></label>
+		<input type="range" id="xMax" min="10" max="100" value="100" oninput="updateRange()">
+		
+		<br><br>
+		<button onclick="resetView()">Нулиране</button>
+	</div>
+	
 	<canvas id="picasso"></canvas>
+	
+	<script>
+		function updateRange()
+		{
+			xMin = parseFloat(document.getElementById('xMin').value);
+			xMax = parseFloat(document.getElementById('xMax').value);
+			
+			document.getElementById('xMinVal').textContent = xMin;
+			document.getElementById('xMaxVal').textContent = xMax;
+		}
+		
+		function resetView()
+		{
+			xMin = 0;
+			xMax = 100;
+			document.getElementById('xMin').value = 0;
+			document.getElementById('xMax').value = 100;
+			document.getElementById('xMinVal').textContent = 0;
+			document.getElementById('xMaxVal').textContent = 100;
+		}
+	</script>
 </body>
