@@ -1,0 +1,38 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Стилове</title>
+
+	<style>
+		body	{ text-align: center; }
+		canvas	{ border: solid 1px; }
+	</style>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function main()
+		{
+			new Suica();
+			demo(40);
+
+			n = 500;
+			for (var i=0; i<n; i++)
+			{
+				alpha = 2*Math.PI*i/n;
+				center = [5*Math.cos(alpha),5*Math.sin(alpha),Math.sin(-5*alpha)];
+				prism(center,0.15,15+8*Math.sin(5*alpha),6).custom({
+					focus: [Math.cos(alpha),Math.sin(alpha),0.5*Math.sin(5*alpha)],
+					color: [random(0,0.5),random(0.6,1),1]
+				});
+			}
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Стилове</h2>
+	
+	<canvas width="600" height="400"></canvas>
+</body>

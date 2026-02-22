@@ -1,0 +1,58 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Лабиринт</title>
+
+	<style>
+		body	{ text-align: center; }
+		canvas	{ border: Green solid 2px; }
+	</style>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function labyrinth(x1,x2,y1,y2)
+		{
+			var dx = x2-x1;
+			var dy = y2-y1;
+			var m = Math.max(dx,dy);
+			var n = Math.min(dx,dy);
+			
+			if (m<=10) return;
+			
+			m = 10*Math.round(random(1,m/10-1));
+			n = 10*Math.round(random(0,n/10-1));
+
+			if (dx>=dy)
+			{
+				segment([x1+m,y1,0], [x1+m,y1+n,0]);
+				segment([x1+m,y1+n+10,0], [x1+m,y2,0]);
+				labyrinth(x1,x1+m,y1,y2);
+				labyrinth(x1+m,x2,y1,y2);
+			}
+			else
+			{
+				segment([x1,y1+m,0], [x1+n,y1+m,0]);
+				segment([x1+n+10,y1+m,0], [x2,y1+m,0]);
+				labyrinth(x1,x2,y1,y1+m);
+				labyrinth(x1,x2,y1+m,y2);
+			}
+		}
+		
+		function main()
+		{
+			p = new Suica();
+			orthographic(-200,200);
+			lookAt([0,0,100],[0,0,0],[0,1,0]);
+			
+			labyrinth(-300,300,-200,200);
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Лабиринт</h2>
+	
+	<canvas width="600" height="400"></canvas>
+</body>

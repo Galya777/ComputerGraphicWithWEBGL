@@ -1,0 +1,125 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Текстуриран куб</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// използваме модул №0 за текстури
+			gl.uniform1i(uSampler, 0);
+			gl.activeTexture(gl.TEXTURE0);
+
+			block = gl.createTexture();
+			var image = new Image();
+			image.onload = function() {imageLoaded(image)};
+			image.src = 'block.jpg';
+
+			// дефиниране на пробит куб
+			c = [];
+			for (var x=-1; x<2; x++)
+			for (var y=-1; y<2; y++)
+			for (var z=-1; z<2; z++)
+			if (x*x+y*y+z*z>1.1)
+				c.push( custom(new Cube([x,y,z],1),{texture: block}) );
+		}
+
+		// функция, която се извиква след зареждането на изображение
+		function imageLoaded(image)
+		{
+			// правим си текуща текстура
+			gl.bindTexture(gl.TEXTURE_2D, block);
+			
+			// сменяме посоката по Y
+			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+			
+			// прехвърляме данните от картинката в текстурата
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+		
+			// автоматично генериране на всички нива на mipmap  текстури
+			gl.generateMipmap(gl.TEXTURE_2D);
+			
+			// задаваме филтри за увеличаване и намаляване
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+			
+			// махаме текуща текстура
+			gl.bindTexture(gl.TEXTURE_2D, null);
+		}
+		
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			var b = 1.5*sin(time/2);
+			lookAt([9*cos(time)*cos(b),9*sin(time)*cos(b),9*sin(b)],[0,0,0],[0,0,1]);
+
+			// рисуване на обектите
+			for (var i=0; i<c.length; i++)
+				c[i].draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// промяна на филтъра при намаление на текстурата
+		function setScale(scale)
+		{
+			for (var i=0; i<c.length; i++)
+				c[i].texScale = scale;
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Текстуриран куб</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	Кубчета:
+	<button onclick="setScale(1)">1x1x1</button>
+	<button onclick="setScale(2)">2x2x2</button>
+	<button onclick="setScale(3)">3x3x3</button>
+	<button onclick="setScale(4)">4x4x4</button>
+	<button onclick="setScale(5)">5x5x5</button>
+	<button onclick="setScale(10)">10x10x10</button>
+	<button onclick="setScale(15)">15x15x15</button>
+</body>

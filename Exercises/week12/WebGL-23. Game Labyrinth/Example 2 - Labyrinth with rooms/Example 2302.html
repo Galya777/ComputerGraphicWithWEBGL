@@ -1,0 +1,113 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Лабиринт със стаи</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body   { text-align: center; }
+		canvas { border: solid 1px DarkSlateGray; }
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			init();
+			drawFrame();
+		}
+		
+		function Wall(x,y,dx,dy)
+		{
+			return custom(new Cuboid([x+dx/2,y+dy/2,0],[dx?dx:0.3,dy?dy:0.3,0.1]),{color:[0,0,0]});
+		}
+		
+		function labyrinth(x1,x2,y1,y2)
+		{
+			var dx = x2-x1;
+			var dy = y2-y1;
+			var m = Math.max(dx,dy);
+			var n = Math.min(dx,dy);
+			
+			if (m<=10) return;
+
+			m = Math.round(random(3,m-3));
+			n = Math.round(random(0,n-1));
+
+			if (dx>=dy)
+			{
+				wall.push( Wall(x1+m,y1,0,n) );
+				wall.push( Wall(x1+m,y1+n+1,0,dy-n-1) );
+				labyrinth(x1,x1+m,y1,y2);
+				labyrinth(x1+m,x2,y1,y2);
+			}
+			else
+			{
+				wall.push( Wall(x1,y1+m,n,0) );
+				wall.push( Wall(x1+n+1,y1+m,dx-n-1,0) );
+				labyrinth(x1,x2,y1,y1+m);
+				labyrinth(x1,x2,y1+m,y2);
+			}
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			lookAt([0,0,85],[0,0,0],[0,1,0]);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.2,0.2,0.2);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			wall = [];
+			// стени на лабиринта
+			wall.push( Wall(-30,-20, 60, 0) );
+			wall.push( Wall(-30, 20, 60, 0) );
+			wall.push( Wall(-30,-20,  0,40) );
+			wall.push( Wall( 30,-20,  0,40) );
+
+			labyrinth(-30,30,-20,20);
+
+			requestAnimationFrame(drawFrame);
+		}
+
+		function drawFrame()
+		{
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			for (var i=0; i<wall.length; i++)
+			{
+				wall[i].draw();
+			}
+			
+//			requestAnimationFrame(drawFrame);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Лабиринт със стаи</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

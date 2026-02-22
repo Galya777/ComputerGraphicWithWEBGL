@@ -1,0 +1,38 @@
+<html>
+<head>
+    <title>Turbulenz Introduction</title>
+    <!-- Script includes go here -->
+    <script src="jslib/debug.js"></script>
+    <script src="jslib/webgl/turbulenzengine.js"></script>
+    <script src="jslib/webgl/graphicsdevice.js"></script>
+</head>
+<body>
+    <canvas id="canvas" width="640px" height="480px"/>
+    <script>
+        /* Game code goes here */
+
+        TurbulenzEngine = WebGLTurbulenzEngine.create({  //конструиране на инстанция на Turbulenz engine
+            canvas: document.getElementById("canvas")
+        });
+
+        var graphicsDevice = TurbulenzEngine.createGraphicsDevice({}); //конструиране на инстанция на Graphics Device
+
+        var r = 1.0, g = 1.0, b = 0.0, a = 1.0; //задаване на цветове и правене на масив от тях
+        var bgColor = [r, g, b, a];
+
+        function update() {
+            /* Update code goes here */
+
+            if (graphicsDevice.beginFrame())
+            {
+                graphicsDevice.clear(bgColor, 1.0); //показване на жълтия фон
+                /* Rendering code goes here */
+
+                graphicsDevice.endFrame();
+            }
+        }
+
+        TurbulenzEngine.setInterval(update, 1000 / 60);
+    </script>
+</body>
+</html>

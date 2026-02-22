@@ -1,0 +1,148 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Мека връзка</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			text-align: center;
+		}
+
+		canvas {
+			border: solid 0.5em Green;
+			cursor: crosshair;
+		}
+	</style>
+	
+	<script>
+		// окръжност - конструктор с център и радиус
+		Circle = function(x,y,z,r)
+		{	
+			this.n = 48;
+			var data = [0,0,0];
+			for (var i=0; i<=this.n; i++)
+			{
+				var a = 2*PI*i/this.n;
+				data.push(cos(a),sin(a),0);
+			}
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.color = [1,0.5,0];
+			this.buf = buf;
+			this.scale = [r,r,r];
+			this.center = [x,y,z];
+		}
+
+		// окръжност - метод за рисуване
+		Circle.prototype.draw = function()
+		{	
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			translate(this.center);
+			scale(this.scale);
+			useMatrix();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+			gl.drawArrays(gl.TRIANGLE_FAN,0,this.n+2);
+			popMatrix();
+		}
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			// прехващане на мишката само над графичното поле
+			canvas.addEventListener('mousemove',mouseMove,false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.9,1,0.9,1);
+
+			identity();
+			var proj=orthoMatrix(gl.canvas.width,gl.canvas.height,-1000,1000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			// окръжности, номер -1 е фалшива
+			n = 100;
+			cir = [];
+			cir[-1] = {};
+			cir[-1].center = [0,0];
+			for (var i=0; i<n; i++)
+			{
+				cir[i] = new Circle(0,0,-i,i+3);
+				var a = 1.5*2*PI*i/n;
+				cir[i].color = [0.5+0.5*cos(a),0.5+0.5*cos(a+2*PI/3),0.5+0.5*cos(a+4*PI/3)];
+			}
+		}
+
+		var oldTime = now();
+		var speed = 20;
+		
+		function drawFrame()
+		{
+			dT = now()-oldTime;
+			oldTime += dT;
+			
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([0,0,500],[0,0,0],[0,1,0]);
+
+			for (var i=0; i<n; i++)
+				cir[i].draw();
+			
+			// преместваме всяка окръжност към предишната,
+			// а първата се премества към фалшивата
+			var k = speed*dT;
+			if (k>0.9) k=0.9;
+			if (k<0.01) k=0.01;
+			for (var i=0; i<n; i++)
+			{
+				cir[i].center[0] = cir[i].center[0]*(1-k)+k*cir[i-1].center[0];
+				cir[i].center[1] = cir[i].center[1]*(1-k)+k*cir[i-1].center[1];
+			}
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// при движение на мишката се запомня целта като
+		// център на фалшивата окръжност
+		function mouseMove(event)
+		{
+			cir[-1].center[0] = getX(event);
+			cir[-1].center[1] = getY(event);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Мека връзка</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="speed=5;">5x</button>
+	<button onclick="speed=10;">10x</button>
+	<button onclick="speed=20;">20x</button>
+	<button onclick="speed=50;">50x</button>
+</body>

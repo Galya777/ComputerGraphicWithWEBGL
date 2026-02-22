@@ -1,0 +1,259 @@
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+    <title>
+        myfirstapp
+    </title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+    <style type="text/css">
+html, body, div, span, object, iframe, h1, h2, p, a, img, ul, li, fieldset, form, label, legend, table, thead, tbody, tfoot, tr, th, td {
+    border: 0;
+    font-size: 100%;
+    margin: 0;
+    outline: 0;
+    padding: 0;
+    vertical-align: baseline;
+}
+    </style>
+    <!-- block tz_app_header -->
+    
+    <!-- end tz_app_header -->
+</head>
+<body style="background:#B4B4B4;font:normal normal normal 13px/1.231 Helvetica,Arial,sans-serif;text-shadow:1px 1px #F9F8F8;">
+    <div id="titlebar" style="position:fixed;height:65px;top:0;right:0;left:0;">
+        <strong style="font-size:24px;line-height:64px;margin:16px;">
+            <!-- block tz_app_title_name -->
+            
+            myfirstapp
+            
+            <!-- end tz_app_title_name -->
+        </strong>
+        <div id="titlelogo"
+             style="float:right;width:27px;height:27px;margin:18px 24px;">
+        </div>
+    </div>
+    <div id="sidebar"
+         style="background:#B4B4B4;position:fixed;width:303px;top:65px;left:0;">
+        <!-- block tz_app_html_controls -->
+        
+        
+        <!-- end tz_app_html_controls -->
+    </div>
+    <div id="engine" style="background:#939393;position:fixed;top:65px;
+                            bottom:0;right:0;left:303px;
+                            border-left:1px solid #898989;">
+        <!--
+          HTML to create a plugin or canvas instance.
+          Supplied by 'tz_engine_div' variable.
+        -->
+        
+        <canvas id="turbulenz_game_engine_canvas" moz-opaque="true" tabindex="1">
+            Sorry, but your browser does not support WebGL or does not have it
+            enabled.  To get a WebGL-enabled browser, please see:<br/>
+            <a href="http://www.khronos.org/webgl/wiki/Getting_a_WebGL_Implementation" target="_blank">
+                Getting a WebGL Implementation
+            </a>
+        </canvas>
+
+        <script type="text/javascript">
+            var canvasSupported = true;
+            (function()
+            {
+                var contextNames = ["webgl", "experimental-webgl"];
+                var context = null;
+                var canvas = document.createElement('canvas');
+
+                document.body.appendChild(canvas);
+
+                for (var i = 0; i < contextNames.length; i += 1)
+                {
+                    try {
+                        context = canvas.getContext(contextNames[i]);
+                    } catch (e) {}
+
+                    if (context) {
+                        break;
+                    }
+                }
+                if (!context)
+                {
+                    canvasSupported = false;
+                    window.alert("Sorry, but your browser does not support WebGL or does not have it enabled.");
+                }
+
+                document.body.removeChild(canvas);
+            }());
+            var TurbulenzEngine = {};
+        </script>
+    </div>
+
+    <!-- begin 'tz_include_js' variable -->
+    <script type="text/javascript" src="jslib/debug.js"></script>
+<script type="text/javascript" src="jslib/vmath.js"></script>
+<script type="text/javascript" src="jslib/utilities.js"></script>
+<script type="text/javascript" src="jslib/aabbtree.js"></script>
+<script type="text/javascript" src="jslib/observer.js"></script>
+<script type="text/javascript" src="jslib/webgl/ddsloader.js"></script>
+<script type="text/javascript" src="jslib/webgl/graphicsdevice.js"></script>
+<script type="text/javascript" src="jslib/webgl/inputdevice.js"></script>
+<script type="text/javascript" src="jslib/webgl/mathdevice.js"></script>
+<script type="text/javascript" src="jslib/webgl/networkdevice.js"></script>
+<script type="text/javascript" src="jslib/webgl/physicsdevice.js"></script>
+<script type="text/javascript" src="jslib/webgl/sounddevice.js"></script>
+<script type="text/javascript" src="jslib/webgl/soundtarloader.js"></script>
+<script type="text/javascript" src="jslib/webgl/tarloader.js"></script>
+<script type="text/javascript" src="jslib/webgl/tgaloader.js"></script>
+<script type="text/javascript" src="jslib/webgl/touch.js"></script>
+<script type="text/javascript" src="jslib/webgl/touchevent.js"></script>
+<script type="text/javascript" src="jslib/webgl/turbulenzengine.js"></script>
+<script type="text/javascript" src="jslib/camera.js"></script>
+<script type="text/javascript" src="jslib/floor.js"></script>
+<script type="text/javascript" src="jslib/requesthandler.js"></script>
+    <!-- end 'tz_include_js' variable -->
+
+    <script type="text/javascript">
+      // ----------------------------------------
+      // Embedded code and startup code.
+      // Supplied by 'tz_startup_code' variable.
+      // ----------------------------------------
+      
+	TurbulenzEngine.onload = function onloadFn() 
+	{
+	var intervalID;
+	var gd = TurbulenzEngine.createGraphicsDevice({});
+	var md = TurbulenzEngine.createMathDevice({}); //инстанция на математическото устройство
+
+	var camera = Camera.create(md);      //инстанция на камера
+	var floor = Floor.create(gd, md);    //строи линии в равнината XY
+	var shader = null;
+	var technique = null;
+	var angle = 0; 
+		
+	var requestHandler = RequestHandler.create({}); 
+	requestHandler.request({ //метод за зареждане на външния шейдър
+		src: 'generic3D.cgfx.json',
+		onload: function (shaderJSON)
+		{
+			var shaderParameters = JSON.parse(shaderJSON);
+			shader = gd.createShader(shaderParameters);
+			technique = shader.getTechnique('vertexColor3D'); //избор на техника за рисуване от шейдъра
+		}
+	});
+
+
+var techniqueParameters = gd.createTechniqueParameters({}); //инстанция на параметри на рисуване
+	
+	var vertData = [];
+	function addVerts(x,y,z,size,col1,col2,col3) //функция, която добавя върховете 
+	{											 //на кубовете в масив
+	size = size/2;
+	var vertLBF = [ x-size, y-size,  z+size, col1, col2, col3, 1 ]; //върховете на куба
+	var vertLTF = [ x-size, y+size,  z+size, col1, col2, col3, 1 ];
+	var vertRTF = [ x+size, y+size,  z+size, col1, col2, col3, 1 ];
+	var vertRBF = [ x+size, y-size,  z+size, col1, col2, col3, 1 ];
+	var vertLBB = [ x-size, y-size,  z-size, col1, col2, col3, 1 ];
+	var vertLTB = [ x-size, y+size,  z-size, col1, col2, col3, 1 ];
+	var vertRTB = [ x+size, y+size,  z-size, col1, col2, col3, 1 ];
+	var vertRBB = [ x+size, y-size,  z-size, col1, col2, col3, 1 ];
+	vertData=vertData.concat(
+		vertLTF, vertLBF, vertRTF, vertRTF, vertLBF, vertRBF,  // предна
+		vertRTF, vertRBF, vertRTB, vertRTB, vertRBF, vertRBB,  // дясна
+		vertLTB, vertLBB, vertLTF, vertLTF, vertLBB, vertLBF,  // лява
+		vertRTB, vertRBB, vertLTB, vertLTB, vertRBB, vertLBB,  // задна
+		vertLTB, vertLTF, vertRTB, vertRTB, vertLTF, vertRTF,  // горна
+		vertLBF, vertLBB, vertRBF, vertRBF, vertLBB, vertRBB   // долна
+	);
+	};
+	addVerts(0,0,0,3,1,1,1);
+	addVerts(0,0,3,2,1,0,0.5);
+	addVerts(0,0,-3,2,1,0.8,0);
+	addVerts(3,0,0,2,0,1,0.5);
+	addVerts(-3,0,0,2,0,0.5,1);
+	
+	var numVerts = vertData.length;
+	var vertexBuffer = gd.createVertexBuffer({ //строим буфера за върховете
+		numVertices: vertData.length,
+		attributes: [gd.VERTEXFORMAT_FLOAT3, gd.VERTEXFORMAT_UBYTE4N],
+		data: vertData,                       //взимаме информация от създадения масив с върхове
+	});
+
+	var semantics = gd.createSemantics([ gd.SEMANTIC_POSITION,
+										 gd.SEMANTIC_COLOR ]);
+	function tick()
+	{
+	  if (gd.beginFrame())
+	  {
+		angle += Math.PI / 720;
+		gd.clear([0.0, 0.0, 0.0, 1.0], 1.0, 0.0);
+		
+		camera.lookAt(md.v3BuildZero(),  //на къде гледа камерата  
+					md.v3Build(0, 1, 0), //посока нагоре за камерата
+					md.v3Build(15*Math.cos(angle), 10, 15*Math.sin(angle)));//позиция на камерата
+		camera.updateViewMatrix();			
+		camera.updateViewProjectionMatrix();
+		
+		floor.render(gd, camera); //рисуване на "под"
+	  
+	  if (technique) //ако са заредени шейдъра и техниката
+		{
+		techniqueParameters.worldViewProjection = camera.viewProjectionMatrix;
+		gd.setTechnique(technique);
+		gd.setTechniqueParameters(techniqueParameters);
+		gd.setStream(vertexBuffer, semantics);
+		gd.draw(gd.PRIMITIVE_TRIANGLES, numVerts, 0);
+		}
+	  gd.endFrame();
+	  }
+	}
+	  intervalID = TurbulenzEngine.setInterval(tick, 1000/60);
+	};
+
+        // Engine startup
+        window.onload = function ()
+        {
+            var appEntry = TurbulenzEngine.onload;
+            var appShutdown = TurbulenzEngine.onunload;
+            if (!appEntry) {
+                window.alert("TurbulenzEngine.onload has not been set");
+                return;
+            }
+
+            var canvas =
+                document.getElementById('turbulenz_game_engine_canvas');
+
+            var startCanvas = function startCanvasFn()
+            {
+                if (canvas.getContext && canvasSupported)
+                {
+                    TurbulenzEngine = WebGLTurbulenzEngine.create({
+                        canvas: canvas,
+                        fillParent: true
+                    });
+
+                    if (!TurbulenzEngine) {
+                        window.alert("Failed to init TurbulenzEngine (canvas)");
+                        return;
+                    }
+
+                    TurbulenzEngine.onload = appEntry;
+                    TurbulenzEngine.onunload = appShutdown;
+                    appEntry()
+                }
+            }
+
+            var previousOnBeforeUnload = window.onbeforeunload;
+            window.onbeforeunload = function ()
+            {
+                if (TurbulenzEngine.onunload) {
+                    TurbulenzEngine.onunload.call(this);
+                }
+            };  // window.beforeunload
+
+            startCanvas();
+        };  // window.onload()
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Текстурна матрица</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// установява единична текстурна 3D матрица
+		function texIdentity()
+		{
+			return new Float32Array([1,0,0,0,1,0,0,0,1]);
+		}
+		
+		// транслира текстурна 3D матрица с 2D вектор 
+		function texTranslate(m,v)
+		{
+			m[6] += m[0]*v[0]+m[3]*v[1];
+			m[7] += m[1]*v[0]+m[4]*v[1];
+		}
+
+		// мащабира текстурна 3D матрица с 2D вектор 
+		function texScale(m,v)
+		{
+			m[0] *= v[0];
+			m[1] *= v[0];
+			
+			m[3] *= v[1];
+			m[4] *= v[1];
+		}
+
+		// върти текстурна 3D матрица на ъгъл в градуси 
+		function texRotate(m,a)
+		{
+			a = radians(a);
+			var s = Math.sin(a);
+			var c = Math.cos(a);
+			
+			a = m[0]*s+m[3]*c;
+			m[0]=m[0]*c-m[3]*s;
+			m[3]=a;
+			
+			a = m[1]*s+m[4]*c;
+			m[1]=m[1]*c-m[4]*s;
+			m[4]=a;
+		}
+ 
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// използваме модул №0 за текстури
+			gl.uniform1i(uSampler, 0);
+			gl.activeTexture(gl.TEXTURE0);
+
+			var m; // текстурна матрица
+
+			// дефиниране на четири куба текстурирани по различен начин
+			cube = [];
+			cube[0] = new Cube([-2,2,0],3);
+			cube[0].color = [1,1,1];
+			cube[0].texture = loadTexture('crosshatch.jpg');
+			m = texIdentity();
+			texScale(m,[4,4]);
+			cube[0].texMatrix = m;
+
+			m = texIdentity();
+			cube[1] = new Cube([-2,-2,0],3);
+			cube[1].color = [1,1,1];
+			cube[1].texture = cube[0].texture;
+			m = texIdentity();
+			texTranslate(m,[0.5,0.5]);
+			texRotate(m,45);
+			texTranslate(m,[-0.5,-0.5]);
+			cube[1].texMatrix = m;
+
+			m = texIdentity();
+			cube[2] = new Cube([2,-2,0],3);
+			cube[2].color = [1,1,1];
+			cube[2].texture = cube[0].texture;
+			m = texIdentity();
+			texTranslate(m,[0.5,0.5]);
+			cube[2].texMatrix = m;
+
+			m = texIdentity();
+			cube[3] = new Cube([2,2,0],3);
+			cube[3].color = [1,1,1];
+			cube[3].texture = cube[0].texture;
+			m = texIdentity();
+			texTranslate(m,[0.5,0]);
+			texScale(m,[0.707,0.707]);
+			texRotate(m,45);
+			cube[3].texMatrix = m;
+
+		}
+
+		
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([12*cos(time),12*sin(time),8],[0,0,0],[0,0,1]);
+			yRotate(0.5);
+			
+			// рисуване на кубовете
+			for (var i=0; i<4; i++)
+				cube[i].draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Текстурна матрица</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

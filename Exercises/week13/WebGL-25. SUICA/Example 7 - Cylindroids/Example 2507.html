@@ -1,0 +1,41 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Цилиндроиди</title>
+
+	<style>
+		body	{ text-align: center; }
+		canvas	{ border: solid 1px; }
+	</style>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function main()
+		{
+			new Suica();
+			demo(40);
+
+			// странични плочки
+			a = cylindroid([0,5,0],[5,10],1);
+			a.focus = [0,1,0];
+			a = cylindroid([0,-5,0],[5,10],1);
+			a.focus = [0,-1,0];
+			
+			// вътрешни цилиндри
+			a = cylinder([7,-6.5,0],1,13);
+			a.focus = [0,1,0];
+			a.color = [1,0.7,0];
+			a = cylinder([-7,-6.5,0],1,13);
+			a.focus = [0,1,0];
+			a.color = [1,0.7,0];
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Цилиндроиди</h2>
+	
+	<canvas width="600" height="400"></canvas>
+</body>

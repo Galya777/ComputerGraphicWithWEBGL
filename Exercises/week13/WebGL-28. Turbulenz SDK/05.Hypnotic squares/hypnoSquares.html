@@ -1,0 +1,88 @@
+<html>
+<head>
+    <title>Hypno Squares</title>
+    <script src="jslib/debug.js"></script>
+    <script src="jslib/webgl/turbulenzengine.js"></script>
+    <script src="jslib/webgl/graphicsdevice.js"></script>
+    <script src="jslib/draw2d.js"></script>
+</head>
+<body>
+    <canvas id="canvas" width="900px" height="600px"/>
+    <script>
+
+        TurbulenzEngine = WebGLTurbulenzEngine.create({
+            canvas: document.getElementById("canvas")
+        });
+		
+        var graphicsDevice = TurbulenzEngine.createGraphicsDevice({});
+
+        var draw2D = Draw2D.create({
+            graphicsDevice: graphicsDevice
+        });
+		
+		function distance(x1,y1,x2,y2) // връща дистанция между две точки
+		{
+		return Math.sqrt( Math.pow( Math.abs(x1-x2) , 2) + Math.pow( Math.abs(y1-y2) , 2) );
+		}
+        
+		var PI = Math.PI; 
+        var PI2 = PI * 2;
+        
+		var squares = []; //масив за квадратчетата
+		var accels = [];  //масив за скоростите на всяко квадратче
+		var f=true;
+		function generateSprite(x1,y1)
+		{
+		
+		var sprite1 = Draw2DSprite.create({ //обновен конструктор на квадратче - вече добавя и свойството accel на края на масива със скорости
+            width: 100,
+            height: 100,
+            x: x1,
+            y: y1,
+            color: [1.0, 1.0, 1.0, 1.0],
+            rotation: 0
+			});
+			accels.push(0.1);
+			return sprite1;
+		}
+
+		var scale = []; //масив с разтягането на квадратчетата
+		
+		function update() {
+		
+		if(Math.random()<=0.5) //50% шанс за появяване на ново квадратче
+			{
+			f=true;
+			var x1 = 70.71+Math.random()*(graphicsDevice.width-141.42);
+			var y1 = 70.71+Math.random()*(graphicsDevice.height-141.42);
+			for(i=0;i<squares.length;i++)										//проверка дали квадратчето не се появява прекалено близо
+				if(distance(x1,y1,squares[i].x,squares[i].y)<=141.42)f=false;   // до друго такова
+			if(f==true)squares.push(generateSprite(x1,y1));
+			}
+		
+		for( j = squares.length - 1; j >= 0; j--) //промяна на разтягането и ъгъла на завъртане за всички съществуващи квадратчета 
+			{
+			accels[j] += PI / 30 ;
+			scale[0] = scale[1] = Math.sin( accels[j] / 2 ) ;
+			squares[j].rotation += Math.sin(accels[j]) * 0.2;
+			squares[j].rotation %= PI2;
+			squares[j].setScale(scale);
+			if(accels[j]>=PI * 2){squares.splice( j , 1 );accels.splice(j,1);}//ако квадратчето вече се е уголемило и смалило спираме да го показваме
+			}
+			
+		if (graphicsDevice.beginFrame())
+        {
+            graphicsDevice.clear([1.0, 1.0, 0.0, 1.0], 1.0);
+			
+            draw2D.begin();
+			for(i=0;i<squares.length;i++)draw2D.drawSprite(squares[i]); //рисуване на квадратчетата
+            draw2D.end();
+            
+			graphicsDevice.endFrame();
+        }
+    }
+
+        TurbulenzEngine.setInterval(update, 1000 / 60);
+    </script>
+</body>
+</html>

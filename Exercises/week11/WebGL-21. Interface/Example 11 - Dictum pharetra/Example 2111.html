@@ -1,0 +1,176 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Dictum pharetra</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			background-color: Moccasin;
+			text-align: center;
+		}
+
+		canvas {
+			border: solid 2px Peru;
+		}
+
+		p { margin: 0; }
+		
+		.hud {
+			display: block;
+			font-weight: bold;
+			font-size: 2em;
+			text-align: left;
+			position: absolute;
+			line-height: 1.5em;
+			white-space: nowrap;
+			overflow: hidden;
+		}
+		
+		#labels {
+			width: 7em;
+			font-family: 'Arial Black';
+		}
+		
+		#values {
+			font-family: Arial;
+			color: Red;
+		}
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			var labels = document.getElementById("labels");
+			labels.style.left = (canvas.offsetLeft+20)+'px';
+			labels.style.top = (canvas.offsetTop+10)+'px';
+
+			values = document.getElementById("values");
+			values.style.left = (labels.offsetLeft+labels.offsetWidth)+'px';
+			values.style.top = (labels.offsetTop+2)+'px';
+	
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,0.9,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.2,0.2,0.2);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uSpecularColor,1,1,1);
+			gl.uniform1f(uShininess,5);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			SPHERE_SIDES = 18;
+			
+			// дефиниране на топките
+			n = 8;
+			ball = [];
+			for (var i=0; i<n; i++)
+			{
+				ball[i] = new Sphere([0,1.4*i-5,0],0.6);
+				ball[i].speed = 0.1;
+				ball[i].alpha = random(0,2*PI);
+			}
+		}
+
+		var time=now(), oldTime=time;
+		function now() { return (new Date()).getTime()/1000; }
+		
+		// намира дали е възможно топка i да е на (x,y)
+		function ok(i,x,y)
+		{
+			// удар в стените
+			if (x<-3.5 || x>3.5 || y<-5.4 || y>5.4)
+			{
+				ball[i].alpha = ball[i].alpha+random(PI-1,PI+1);
+				return false;
+			}
+			
+			// удар в друга топка
+			for (var j=0; j<n; j++) if (i!=j)
+			{
+				var dist = Math.pow(ball[j].center[0]-x,2)+Math.pow(ball[j].center[1]-y,2)
+				if (dist<1.2*1.2)
+				{
+					ball[i].alpha = ball[i].alpha+random(PI-1,PI+1);
+					return false;
+				}
+			}
+			
+			// позицията е достъпна
+			return true;
+		}
+		
+		function drawFrame()
+		{
+			time = now();
+
+			// промяна на фоновия цвят
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([0,0,15],[0,0,0],[1,0,0]);
+
+			var html='';
+			for (var i=0; i<7; i++)
+				html += '<p>'+Math.abs(Math.sin(i+time/10)).toFixed(3)+'</p>';
+			document.getElementById("values").innerHTML = html;
+				
+			for (var i=0; i<n; i++)
+			{
+				ball[i].draw();
+
+				ball[i].alpha = ball[i].alpha+random(-0.3,0.3);
+				x = ball[i].center[0]+ball[i].speed*cos(ball[i].alpha);
+				y = ball[i].center[1]+ball[i].speed*sin(ball[i].alpha);
+
+				// ако (x,y) е свободно, местим топка i там
+				if ( ok(i,x,y) )
+					ball[i].center = [x,y,0];
+			}
+
+			requestAnimationFrame(drawFrame);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Dictum pharetra nam posuere</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+	
+	<div class="hud" id="labels">
+		<p>Phasellus.......</p>
+		<p>Blandit.........</p>
+		<p>Pharetra........</p>
+		<p>Euismod.........</p>
+		<p>Est orci........</p>
+		<p>Dignissim.......</p>
+		<p>Vestibulum......</p>
+	</div>
+	<div class="hud" id="values"></div>
+</body>

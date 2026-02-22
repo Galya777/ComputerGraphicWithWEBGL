@@ -1,0 +1,46 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Mauris sagittis</title>
+	
+	<script>
+		function start()
+		{
+			// елемент с id="one" е с червен текст
+			var e = document.getElementById('one');
+			e.style.color = 'red';
+
+			// елементите <p> са с наклонен текст
+			elems = document.getElementsByTagName('p');
+			for (var i=0; i<elems.length; i++)
+				elems[i].style.fontStyle = 'italic';
+
+			// елементите от клас yell са с жълт фон
+			elems = document.getElementsByClassName('yell');
+			for (var i=0; i<elems.length; i++)
+				elems[i].style.backgroundColor = 'yellow';
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Mauris sagittis mi quis lobortis tincidunt</h2>
+
+	<h3>Pellentesque iaculis metus</h3>
+
+	<p id="one">Cras sit amet imperdiet nibh. Vestibulum aliquet quis odio vitae interdum. Donec accumsan, eros at vulputate imperdiet, justo arcu dapibus lectus, ut viverra quam leo quis lacus. Donec suscipit neque eget convallis dignissim. In hac habitasse platea dictumst. Aenean eu elit nisl.</p>
+
+	<h3>Sed malesuada vitae</h3>
+
+	<p id="two">Phasellus viverra tincidunt odio, eget mattis nulla facilisis in. Nam dignissim pretium posuere. Cras sit amet nisi tempus libero pretium sagittis.</p>
+
+	<ol>
+		<li class="yell">Leo pellentesque vulputate</li>
+		<li class="yell">Integer fringilla</li>
+		<li>Nunc non iaculis pulvinar</li>
+	</ol>
+
+	<p id="three" class="yell">Quisque cursus magna massa, hendrerit imperdiet nibh maximus tincidunt. Quisque aliquam ipsum nibh, et condimentum nunc pretium sed. Ut mollis, nisi vel egestas mattis, mauris libero bibendum nunc, dictum dignissim lorem elit vitae felis.</p>
+	
+</body>

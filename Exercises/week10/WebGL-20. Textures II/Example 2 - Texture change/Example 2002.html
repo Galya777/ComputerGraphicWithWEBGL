@@ -1,0 +1,85 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Смяна на текстура</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// използваме модул №0 за текстури
+			gl.uniform1i(uSampler, 0);
+			gl.activeTexture(gl.TEXTURE0);
+
+			// дефиниране на четири текстури
+			textures = [];
+			for (var i=0; i<4; i++)
+				textures[i] = loadTexture('texture'+(i+1)+'.jpg');
+			cube = new Cube([0,0,0],2.5);
+			cube.color = [1,1,1];
+		}
+
+		
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([8,0,0],[0,0,0],[0,sin(time/4),cos(time/4)]);
+
+			// въртене на куба
+			cube.rot = [40*time,30*time+60,45*time+35,35*time+45];
+			
+			// смяна на текстурата
+			cube.texture = textures[Math.round(time/2)%4];
+			
+			// рисуване на куба
+			cube.draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Смяна на текстура</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

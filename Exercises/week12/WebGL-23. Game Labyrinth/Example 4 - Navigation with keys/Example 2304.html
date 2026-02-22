@@ -1,0 +1,180 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Навигация с клавиши</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body   { text-align: center; }
+		canvas { border: solid 1px DarkSlateGray; }
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			document.body.addEventListener('keydown',keyDown,false);
+			document.body.addEventListener('keyup',keyUp,false);
+			
+			init();
+			drawFrame();
+		}
+		
+		function Wall(x,y,dx,dy,narrow)
+		{
+			var z = narrow?1.25:0;
+			var dz = narrow?0.5:2;
+			return custom(new Cuboid([x+dx/2,y+dy/2,z],[dx?dx:0.3,dy?dy:0.3,dz]),{color:[0.9,0.9,1]});
+		}
+		
+		function labyrinth(x1,x2,y1,y2)
+		{
+			var dx = x2-x1;
+			var dy = y2-y1;
+			var m = Math.max(dx,dy);
+			var n = Math.min(dx,dy);
+			
+			if (m<=10) return;
+
+			m = Math.round(random(3,m-3));
+			n = Math.round(random(1,n-3));
+
+			if (dx>=dy)
+			{
+				wall.push( Wall(x1+m,y1,0,n+0.15) );
+				wall.push( Wall(x1+m,y1+n+1-0.15,0,dy-n-1+0.15) );
+				wall.push( Wall(x1+m,y1,0,dy,true) );
+				labyrinth(x1,x1+m,y1,y2);
+				labyrinth(x1+m,x2,y1,y2);
+			}
+			else
+			{
+				wall.push( Wall(x1,y1+m,n+0.15,0) );
+				wall.push( Wall(x1+n+1-0.15,y1+m,dx-n-1+0.15,0) );
+				wall.push( Wall(x1,y1+m,dx,0,true) );
+				labyrinth(x1,x2,y1,y1+m);
+				labyrinth(x1,x2,y1+m,y2);
+			}
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0,0,0,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			lookAt([40,40,85],[0,0,0],[0,0,1]);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.5,0.5,0.5);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			wall = [];
+			// стени на лабиринта
+			wall.push( Wall(-30,-20, 60, 0) );
+			wall.push( Wall(-30, 20, 60, 0) );
+			wall.push( Wall(-30,-20,  0,40) );
+			wall.push( Wall( 30,-20,  0,40) );
+			wall.push( Wall(-30,-20, 60, 0, true) );
+			wall.push( Wall(-30, 20, 60, 0, true) );
+			wall.push( Wall(-30,-20,  0,40, true) );
+			wall.push( Wall( 30,-20,  0,40, true) );
+
+			labyrinth(-30,30,-20,20);
+
+			requestAnimationFrame(drawFrame);
+		}
+
+		sin = Math.sin;
+		cos = Math.cos;
+		
+		pos = [2,2,0];
+		dir = 0;
+		dDir = 0;
+		dPos = 0;
+		kLeft = false;
+		kRight = false;
+		kForward = false;
+		
+		oldTime = now();
+		function drawFrame()
+		{
+			time = now();
+			dTime = time-oldTime;
+			oldTime = time;
+
+			if (kLeft) dDir = +1;
+			if (kRight) dDir = -1;
+			dir += dDir*dTime;
+			if (!kLeft && !kRight) dDir *= (1-5*dTime);
+			
+			if (kForward) dPos = 5;
+			pos[0] += dPos*dTime*cos(dir);
+			pos[1] += dPos*dTime*sin(dir);
+			if (!kForward) dPos *= (1-5*dTime);
+			
+	
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt( 
+					[pos[0],pos[1],4],
+					[pos[0]+10*cos(dir),pos[1]+10*sin(dir),1],
+					[0,0,1] );
+					
+			for (var i=0; i<wall.length; i++)
+			{
+				wall[i].draw();
+			}
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+	function keyDown(event)
+	{
+		// стрелка наляво
+		if (event.keyCode==37) kLeft = true, kRight = false;
+
+		// стрелка напред
+		if (event.keyCode==38) kForward = true;
+
+		// стрелка надясно
+		if (event.keyCode==39) kRight = true, kLeft = false;
+	}
+		
+	function keyUp(event)
+	{
+		// стрелка наляво
+		if (event.keyCode==37) kLeft = false;
+
+		// стрелка напред
+		if (event.keyCode==38) kForward = false;
+
+		// стрелка надясно
+		if (event.keyCode==39) kRight = false;
+	}
+	
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Навигация с клавиши (&#8592; &#8593; &#8594;)</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

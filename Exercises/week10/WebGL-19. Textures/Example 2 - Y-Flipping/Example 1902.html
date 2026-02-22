@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Обръщане по Y</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		// квадрат - конструктор
+		Square = function(center,size)
+		{	// координати на върховете (3D) и на текстурата (2D)
+			var data = [ -0.5,-0.5,0,	0,0,
+						 +0.5,-0.5,0,	1,0,
+						 -0.5,+0.5,0,	0,1,
+						 +0.5,+0.5,0,	1,1 ];
+			this.buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data), gl.STATIC_DRAW);
+			this.center = center;
+			this.size = size;
+			this.color = [1,0.75,0];
+		}
+
+		// квадрат - метод за рисуване
+		Square.prototype.draw = function()
+		{	
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,5*FLOATS,0*FLOATS);
+			gl.vertexAttrib3f(aNormal,0,0,1);
+			gl.vertexAttrib3fv(aColor,this.color);
+
+			// подаване на текстурни координати
+			gl.enableVertexAttribArray(aST);
+			gl.vertexAttribPointer(aST,2,gl.FLOAT,false,5*FLOATS,3*FLOATS);
+
+			// ако текстурата е готова, правим я текуща
+			if (gl.isTexture(texture))
+			{
+				gl.bindTexture(gl.TEXTURE_2D, texture);
+			}
+			
+			pushMatrix();
+				translate(this.center);
+				scale([this.size,this.size,this.size]);
+				useMatrix();
+				gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+			popMatrix();
+		}
+
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// използваме модул №0 за текстури
+			gl.uniform1i(uSampler, 0);
+			gl.activeTexture(gl.TEXTURE0);
+
+			// дефиниране на квадрат
+			s = new Square([0,0,0],2);
+
+			// създаваме (засега празна) текстура
+			texture = gl.createTexture();
+
+			// зареждаме асинхронно изображението за текстурата
+			var image = new Image();
+			image.onload = function() {imageLoaded(image)};
+			image.src = 'texture.jpg';
+		}
+
+		// функция, която се извиква след зареждането на изображение
+		function imageLoaded(image)
+		{
+			// правим си текуща текстура
+			gl.bindTexture(gl.TEXTURE_2D, texture);
+			
+			// сменяме посоката по Y
+			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+			
+			// прехвърляме данните от картинката в текстурата
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+			
+			// задаваме филтри за увеличаване и намаляване
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+			
+			// махаме текуща текстура
+			gl.bindTexture(gl.TEXTURE_2D, null);
+		}
+		
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([6*cos(time/3),0,6*sin(time/3)],[0,0,0],[0,1,0]);
+
+			// рисуване на квадрата
+			s.draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Обръщане по Y</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

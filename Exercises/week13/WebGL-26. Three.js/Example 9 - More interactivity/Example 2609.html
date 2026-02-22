@@ -1,0 +1,61 @@
+﻿<html>
+	<head>
+        <meta charset=utf-8>
+		<title>Oще малко интерактивност</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+		<script src="three.min.js"></script>
+        <script src="orbit_controls.js"></script>
+		<script>
+            var scene = new THREE.Scene();
+            var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+            var renderer = new THREE.WebGLRenderer();
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            renderer.setClearColor( 0xcccccc, 1 ); 
+            document.body.appendChild( renderer.domElement );
+            scene.add(camera);
+
+            var geometry = new THREE.Geometry();
+            geometry.vertices.push(
+                new THREE.Vector3( -5,  5, 0 ),
+                new THREE.Vector3( -5, -5, 0 ),
+                new THREE.Vector3(  5, -5, 0 )
+            );
+            var face = new THREE.Face3(0, 1, 2);
+            geometry.faces.push(face);
+            var material = new THREE.MeshBasicMaterial({color: 0x3300ff});
+            var triangle = new THREE.Mesh(geometry, material);
+            scene.add(triangle);
+            
+            controls = new THREE.OrbitControls(camera);
+            camera.position.z = 10;
+
+            document.addEventListener( 'mousedown', onDocumentMouseDown );
+
+            // промяна на цвят при кликване върху обект с мишката
+            function onDocumentMouseDown( event ) {    
+                var mouse2D = new THREE.Vector2( event.clientX / window.innerWidth * 2 - 1,   
+                                        -event.clientY / window.innerHeight * 2 + 1 );
+                var raycaster =  new THREE.Raycaster();                                        
+                raycaster.setFromCamera( mouse2D, camera );
+                var intersects = raycaster.intersectObjects( [triangle] );
+                if ( intersects.length > 0 ) {
+                    intersects[ 0 ].object.material.color.setHex( Math.random() * 0xffffff );
+                }
+            }
+
+            var drawFrame = function () {
+                requestAnimationFrame( drawFrame );
+                controls.update(); // проверяваме за въртене с мишката
+                camera.lookAt( scene.position );
+                renderer.render( scene, camera );
+            };
+
+            drawFrame();
+		</script>
+	</body>
+</html>

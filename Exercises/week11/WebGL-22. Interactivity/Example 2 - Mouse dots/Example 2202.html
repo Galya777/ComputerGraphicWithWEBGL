@@ -1,0 +1,149 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Миши точки</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			text-align: center;
+		}
+
+		canvas {
+			border: solid 0.5em Green;
+		}
+		
+		#info {
+			position: absolute;
+			font-family: 'Arial Black';
+			font-size: 3em;
+			color: Indigo;
+		}
+	</style>
+	
+	<script>
+		// облак от точки
+		Cloud = function(maxN)
+		{	
+			var data = [];
+			for (var i=0; i<maxN; i++)
+				data.push(0,0,0);
+
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+			
+			this.color = [0,0,0];
+			this.maxN = maxN;
+			this.buf = buf;
+			this.n = 0;
+		}
+
+		// облак - метод за рисуване
+		Cloud.prototype.draw = function()
+		{	
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			useMatrix();
+
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			// върхове
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+
+			// рисуваме n точки
+			gl.drawArrays(gl.POINTS,0,this.n);
+
+			popMatrix();
+		}
+
+		// облак - добавяне на точка
+		Cloud.prototype.point = function(x,y,z)
+		{	
+			if (this.n>=this.maxN) return;
+
+			var data = new Float32Array([x,y,z]);
+			gl.bufferSubData(gl.ARRAY_BUFFER,this.n*3*FLOATS,data);
+			this.n++;
+		}
+		
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			// прехващане на движението на мишката само над графичното поле
+			canvas.addEventListener('mousemove',mouseMove,false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.9,1,0.9,1);
+
+			identity();
+			var proj=orthoMatrix(gl.canvas.width,gl.canvas.height,-1000,1000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			cloud = new Cloud(10000);
+		}
+
+		var time=now(), oldTime=time;
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			oldTime = time;
+			time = now();
+			var dT = time-oldTime;
+
+			// промяна на фоновия цвят
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([0,0,500],[0,0,0],[0,1,0]);
+
+			cloud.draw();
+			
+//			requestAnimationFrame(drawFrame);
+		}
+		
+		// намиране на координатите на мишката при всяко
+		// уловено движение (над графичното поле)
+		function mouseMove(event)
+		{
+			// координати спрямо горния ляв връх
+			var x = event.clientX-gl.canvas.offsetLeft;
+			var y = event.clientY-gl.canvas.offsetTop;
+			
+			// координати спрямо центъра
+			x = +(x-gl.canvas.offsetWidth/2);
+			y = -(y-gl.canvas.offsetHeight/2);
+			
+			cloud.point(x,y,0);
+			requestAnimationFrame(drawFrame);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Миши точки</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

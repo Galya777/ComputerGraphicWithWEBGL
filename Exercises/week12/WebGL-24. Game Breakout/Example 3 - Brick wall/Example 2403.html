@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Тухлена стена</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body   { background-color: MediumSeaGreen; }
+
+		canvas {
+			border: solid 1px Black;
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width:480px;
+			height:480px;
+			margin: -250px 0 0 -250px;
+			display: block;
+			box-shadow: 0 0 10em Black, 0 0 12px 1px MediumSeaGreen inset;
+			padding: 10px;
+			background-color: #d9ffd9;
+			transform: rotate(0deg);
+		}
+	</style>
+	
+	<script>
+		// буфер на тухла
+		var brickBuffer;
+
+		// тухла
+		Brick = function(center,color)
+		{
+			this.center = [center[0],center[1],1];
+			this.color = color;
+			
+			if (!brickBuffer)
+			{
+				var data = [
+						  0, 0,0,  0, 0,1,	// център
+						-23.5,-8.5,0,  0,-1,0,	// 4 периферни точки
+						-23.5,+8.5,0, -2, 1,1,
+						+23.5,+8.5,0, +2, 1,1,
+						+23.5,-8.5,0,  0,-1,0,
+						-23.5,-8.5,0,  0,-1,0,	// повторение на първата периферна точка
+						];
+				brickBuffer = gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER,brickBuffer);
+				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			}
+		}
+		// тухла - рисуване
+		Brick.prototype.draw = function()
+		{
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			translate(this.center);
+			useMatrix();
+			gl.drawArrays(gl.TRIANGLE_FAN,0,6);
+			gl.drawArrays(gl.LINE_LOOP,1,4);
+			popMatrix();
+		}
+		// подготовка за рисуване
+		function willDrawBricks()
+		{
+			gl.bindBuffer(gl.ARRAY_BUFFER,brickBuffer);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,6*FLOATS,0*FLOATS);
+			gl.enableVertexAttribArray(aNormal);
+			gl.vertexAttribPointer(aNormal,3,gl.FLOAT,false,6*FLOATS,3*FLOATS);
+		}
+
+
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			init();
+			drawFrame();
+		}
+
+		function buildWall()
+		{
+			bricks = [];
+			
+			for (var x=-200; x<=200; x+=50)
+				for (var y=0; y<=220; y+=20)
+					bricks.push (new Brick([x,y], [random(0,1),random(0,1),random(0,1)]));
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.85,1,0.85,1);
+
+			identity();
+			ortho(gl.canvas.width,gl.canvas.height,-100,100);
+
+			gl.uniform3f(uAmbientColor,0.5,0.5,0.5);
+			gl.uniform3f(uDiffuseColor,0.8,0.8,0.8);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			buildWall();
+
+			requestAnimationFrame(drawFrame);
+		}
+
+		oldTime = now();
+		function drawFrame()
+		{
+			time = now();
+			dTime = time-oldTime;
+			oldTime = time;
+
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			identity();
+			lookAt([0,0,100],[0,0,0],[0,1,0]);
+
+			willDrawBricks();
+			for (var i=0; i<bricks.length; i++)
+				bricks[i].draw();
+				
+			requestAnimationFrame(drawFrame);
+		}
+		
+	</script>
+</head>
+
+<body onload="start()">
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="480" height="480">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,69 @@
+﻿<html>
+	<head>
+        <meta charset=utf-8>
+		<title>Движеща се сфера</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+		<script src="three.min.js"></script>
+		<script>
+			var scene = new THREE.Scene();
+			var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+			var renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+            renderer.setClearColor( 0xcccccc, 1 ); 
+			document.body.appendChild( renderer.domElement );
+            
+            var geometry = new THREE.SphereGeometry( 1, 32, 32 );
+            var material = new THREE.MeshBasicMaterial( {color: 0xffff00} );
+            var sphere = new THREE.Mesh( geometry, material );
+            scene.add( sphere );
+            scene.add( camera );
+            
+            var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+            scene.add( directionalLight ); 
+            directionalLight.position.set(0, 1, 1);
+
+            camera.position.z = 10;
+            camera.position.y = 2;
+                        
+            var i = 0, k = 5; 
+			var drawFrame = function () {
+                i++;
+				requestAnimationFrame( drawFrame ); 
+                
+                var x = 3 * Math.cos(2 * -i * (Math.PI/360)) + Math.cos(10 * i * (Math.PI/360));
+                var y = 3 * Math.sin(2 * -i *(Math.PI/360)) + Math.sin(10 * i * (Math.PI/360));
+                var z = 2; 
+                sphere.position.set(x , y, z);
+                
+                if( i <= 360) // за да не рисуваме излишно точка, ако вече съществува
+                {
+                    var geometry2 = new THREE.Geometry();
+                    geometry2.vertices.push(new THREE.Vector3(x, y, z));
+                    var material2 = new THREE.PointsMaterial( { color: 0x00ff00, size: 0.25} );
+                    var particle = new THREE.Points(geometry2, material2);
+                    scene.add( particle );
+                }
+                
+                camera.lookAt( scene.position );
+				renderer.render( scene, camera );
+                controls.update;
+			};
+            
+            window.addEventListener( 'resize', onWindowResize );
+            
+            function onWindowResize()
+            {
+               camera.aspect = window.innerWidth / window.innerHeight;
+               camera.updateProjectionMatrix();
+               renderer.setSize( window.innerWidth, window.innerHeight );
+            }
+
+			drawFrame();
+		</script>
+	</body>
+</html>

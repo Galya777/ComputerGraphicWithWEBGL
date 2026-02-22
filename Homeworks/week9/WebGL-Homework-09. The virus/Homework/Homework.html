@@ -59,6 +59,7 @@
         var gl;
         var virus;
         var time = 0;
+        var initialized = false;
         
         // Virus class
         class Virus {
@@ -324,6 +325,11 @@
         function start() {
             gl = getContext("canvas");
             
+            // Set canvas size
+            gl.canvas.width = window.innerWidth;
+            gl.canvas.height = window.innerHeight;
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+            
             glprog = getProgram("vShader", "fShader");
             getVariables();
             
@@ -341,10 +347,13 @@
             gl.uniform3f(uLightDir, 0.5, 0.5, 1);
             gl.uniform1f(uAlpha, 1.0);
             
+            initialized = true;
             requestAnimationFrame(draw);
         }
         
         function draw() {
+            if (!initialized) return;
+            
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             
             var aspect = gl.canvas.width / gl.canvas.height;

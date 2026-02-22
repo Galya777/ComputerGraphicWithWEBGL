@@ -1,0 +1,163 @@
+<html>
+<head>
+    <title>Hypnotic Squares - Game Final</title>
+    <script src="jslib/debug.js"></script>
+    <script src="jslib/fontmanager.js"></script>
+    <script src="jslib/webgl/turbulenzengine.js"></script>
+    <script src="jslib/webgl/graphicsdevice.js"></script>
+    <script src="jslib/webgl/inputDevice.js"></script>
+   
+    <script src="jslib/draw2d.js"></script>
+</head>
+<body>
+    <canvas id="canvas" width="900px" height="600px"/>
+    <script>
+		
+	
+		
+		
+		
+		
+		TurbulenzEngine = WebGLTurbulenzEngine.create({
+            canvas: document.getElementById("canvas")
+        });
+		var inputDeviceOptions = { };
+		var inputDevice = TurbulenzEngine.createInputDevice(inputDeviceOptions);
+		var mouseCodes = inputDevice.mouseCodes;
+		var hit = false;
+		var gameover=false; //глобална променлива за това дали играта е свършила
+		var speed = Math.PI / 360;
+		var eventPositionX = 0;
+		var eventPositionY = 0;
+		var onMouseDown = function onMouseDownFn(mouseCode, x, y)
+		 {	
+			if (mouseCode == mouseCodes.BUTTON_0)
+			{
+			if(!gameover)
+			{eventPositionX = x;
+			eventPositionY = y;
+			}
+			}
+		 };
+		inputDevice.addEventListener('mousedown', onMouseDown);
+        
+		
+		
+		
+		var graphicsDevice = TurbulenzEngine.createGraphicsDevice({});
+
+        var draw2D = Draw2D.create({
+            graphicsDevice: graphicsDevice
+        });
+		
+		function distance(x1,y1,x2,y2)
+		{
+		return Math.sqrt( Math.pow( Math.abs(x1-x2) , 2) + Math.pow( Math.abs(y1-y2) , 2) );
+		}
+        
+		var r = 1.0, g = 1.0, b = 0.0, a = 1.0;
+        var bgColor = [1.0, 1.0, 0.0, 1.0];
+		var PI = Math.PI; 
+        var PI2 = PI * 2;
+        
+		var squares = [];
+		var accels = [];
+		var f=true;
+		function generateSprite(x1,y1)
+		{
+			var type = []
+			if(Math.random() <= 0.2) type = [1.0, 1.0, 1.0, 1.0]; //20% шанс квадратчето да е бяло
+			else type = [0.0, 0.0, 0.0, 1.0];
+			var sprite1 = Draw2DSprite.create({
+            width: 100,
+            height: 100,
+            x: x1,
+            y: y1,
+            color: type,
+            rotation: 0
+			});
+			accels.push(0.1);
+			return sprite1;
+		}
+		
+		
+		
+		
+		var scale = [];
+		
+		function update()
+		{
+		if(Math.random()<=0.5)
+		{
+		f=true;
+		var x1 = 75+Math.random()*(graphicsDevice.width-150);
+		var y1 = 75+Math.random()*(graphicsDevice.height-150);
+		for(i=0;i<squares.length;i++)if(distance(x1,y1,squares[i].x,squares[i].y)<=140)f=false;
+		if(f==true)squares.push(generateSprite(x1,y1));
+		}
+		
+		if(eventPositionX>0 && eventPositionY>0)
+		{
+		var mine = Draw2DSprite.create({
+            width: 5,
+            height: 5,
+            x: eventPositionX,
+            y: eventPositionY,
+            color: [1.0, 0.0, 0.0, 1.0],
+            rotation: 0
+			});
+		}
+		
+		function rotatePoint(pointX, pointY, originX, originY, angle) {
+		var array = [];
+		array.push(Math.cos(angle) * (pointX-originX) - Math.sin(angle) * (pointY-originY) + originX)
+		array.push(Math.sin(angle) * (pointX-originX) + Math.cos(angle) * (pointY-originY) + originY)
+		return array;
+		}
+		
+		if(!gameover)
+		for( j = squares.length - 1; j >= 0; j--) //вече обновяваме квадратчетата само ако не е вдигнат флага gameover 
+		{
+		accels[j] += speed  ;
+		scale[0] = scale[1] = Math.sin( accels[j] / 2 ) ;
+		squares[j].rotation += Math.sin(accels[j]) * 0.2;
+		squares[j].rotation %= PI2;
+        squares[j].setScale(scale);
+	
+				if( distance (eventPositionX,eventPositionY,squares[j].x,squares[j].y) <=  70)
+				{
+				var newpoint = rotatePoint(eventPositionX,eventPositionY,squares[j].x,squares[j].y, - squares[j].rotation)
+				if( Math.abs( newpoint[0] - squares[j].x ) <= 50*scale[0] 
+				&&  Math.abs( newpoint[1] - squares[j].y ) <= 50*scale[1])
+				{var color1 = squares[j].getColor();
+				if(color1[0]==0.0){gameover=true;eventPositionX=0;eventPositionY=0;} //проверка на цвета на уцеленото квадратче  - ако е черно вдигаме флага gameover
+				else {hit=true;squares.splice( j , 1 );accels.splice(j,1);}
+				}
+				else newpoint = [];	
+				}	
+		
+		
+
+		if(accels[j]>=PI2){squares.splice( j , 1 );accels.splice(j,1);}
+        }
+			
+			if (graphicsDevice.beginFrame())
+            {
+                if(gameover)graphicsDevice.clear( [1.0, 0.0, 0.0, 1.0], 1.0) //ако играта е приключила оцветяваме екрана в червено 
+				else if( hit ){graphicsDevice.clear( [0.0, 1.0, 0.0, 1.0], 1.0);hit=false;speed+=PI/2056;}
+				else graphicsDevice.clear([1.0, 1.0, 0.0, 1.0], 1.0);
+
+				
+                draw2D.begin();
+				for(i=0;i<squares.length;i++)draw2D.drawSprite(squares[i]);
+                if(eventPositionX>0 && eventPositionY>0)draw2D.drawSprite(mine);
+				draw2D.end();
+				
+                graphicsDevice.endFrame();
+            }
+        }
+	
+        TurbulenzEngine.setInterval(update, 1000 / 60);
+    </script>
+</body>
+</html>

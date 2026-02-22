@@ -1,0 +1,119 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Текстура на цилиндър</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+ 
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// използваме модул №0 за текстури
+			gl.uniform1i(uSampler, 0);
+			gl.activeTexture(gl.TEXTURE0);
+
+			// дефиниране на цилиндъра-шайба
+			cFat = new Cylinder([0,0,-1],5,2);
+			cFat.color = [1,1,1];
+			cFat.texture = loadTexture('rustpaint.jpg');
+			// дефиниране на цилиндъра-ос
+			cThin = new Cylinder([0,0,-8],1,16);
+			cThin.color = [1,1,1];
+			cThin.texture = cFat.texture;
+		}
+
+		
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([20*cos(time/2),20*sin(time/2),10],[0,0,0],[0,0,1]);
+			yRotate(0.2);
+
+			// рисуване на двата цилиндъра
+			cFat.draw();
+			cThin.draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// включва или оригинален мащаб на
+		// текстурите, или пропорционален
+		function setScale(original)
+		{
+			var m;
+
+			if (original)
+			{
+				m = texIdentity();
+				cFat.texMatrix = m;
+				cFat.texMatrixBase = m;
+				cThin.texMatrix = m;
+				cThin.texMatrixBase = m;
+			}
+			else
+			{
+				m = texIdentity();
+					texScale(m,[8,1/2]);
+					cFat.texMatrix = m;
+				m = texIdentity();
+					texScale(m,[5/2,5/2]);
+					cFat.texMatrixBase = m;
+				m = texIdentity();
+					texScale(m,[2,4]);
+					cThin.texMatrix = m;
+				m = texIdentity();
+					texScale(m,[1/2,1/2]);
+					cThin.texMatrixBase = m;
+			}
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Текстура на цилиндър</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	Текстурен мащаб:
+	<button onclick="setScale(true)">Оригинален</button>
+	<button onclick="setScale(false)">Пропорционален</button>
+</body>

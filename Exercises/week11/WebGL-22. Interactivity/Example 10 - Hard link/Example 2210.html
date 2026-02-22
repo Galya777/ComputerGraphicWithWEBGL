@@ -1,0 +1,117 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Твърда връзка</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			text-align: center;
+		}
+
+		canvas {
+			border: solid 0.5em Green;
+			cursor: crosshair;
+		}
+	</style>
+	
+	<script>
+		// окръжност - конструктор с център и радиус
+		Circle = function(x,y,r)
+		{	
+			this.n = 48;
+			var data = [0,0,0];
+			for (var i=0; i<=this.n; i++)
+			{
+				var a = 2*PI*i/this.n;
+				data.push(cos(a),sin(a),0);
+			}
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.color = [1,0.5,0];
+			this.buf = buf;
+			this.scale = [r,r,r];
+			this.center = [x,y,0];
+		}
+
+		// окръжност - метод за рисуване
+		Circle.prototype.draw = function()
+		{	
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			translate(this.center);
+			scale(this.scale);
+			useMatrix();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+			gl.drawArrays(gl.TRIANGLE_FAN,0,this.n+2);
+			popMatrix();
+		}
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			// прехващане на мишката само над графичното поле
+			canvas.addEventListener('mousemove',mouseMove,false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.9,1,0.9,1);
+
+			identity();
+			var proj=orthoMatrix(gl.canvas.width,gl.canvas.height,-1000,1000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			// окръжност
+			cir = new Circle(0,0,40);
+		}
+
+		function drawFrame()
+		{
+			// промяна на фоновия цвят
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([0,0,500],[0,0,0],[0,1,0]);
+
+			cir.draw();
+			
+//			requestAnimationFrame(drawFrame);
+		}
+		
+		// при движение на мишката
+		function mouseMove(event)
+		{
+			cir.center = [getX(event),getY(event),0];
+			requestAnimationFrame(drawFrame);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Твърда връзка</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

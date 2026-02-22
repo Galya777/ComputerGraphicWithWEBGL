@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Lacinia purus</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			background-color: Moccasin;
+			text-align: center;
+		}
+
+		button {
+			font-size: 1em;
+			font-family: Consolas;
+			font-weight: bold;
+		}
+		
+		canvas {
+			border: solid 0.5em Peru;
+		}
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,0.7,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.2,0.2,0.2);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uSpecularColor,1,1,1);
+			gl.uniform1f(uShininess,5);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			SPHERE_SIDES = 24;
+			
+			// дефиниране на топките
+			n = 24;
+			ball = [];
+			for (var i=0; i<n; i++)
+			{
+				ball[i] = new Sphere([0,0,0],0.6);
+				ball[i].speed = 0.1;
+				ball[i].alpha = random(0,2*PI);
+			}
+		}
+
+		var time=now(), oldTime=time;
+		function now() { return (new Date()).getTime()/1000; }
+		
+		var m = 1; // брой показвани топки
+
+		// намира дали е възможно топка i да е на (x,y)
+		function ok(i,x,y)
+		{
+			// удар в стените
+			if (x<-3.5 || x>3.5 || y<-5.4 || y>5.4)
+			{
+				ball[i].alpha = ball[i].alpha+random(PI-1,PI+1);
+				return false;
+			}
+			
+			// удар в друга топка
+			for (var j=0; j<m; j++) if (i!=j)
+			{
+				var dist = Math.pow(ball[j].center[0]-x,2)+Math.pow(ball[j].center[1]-y,2)
+				if (dist<1.2*1.2)
+				{
+					ball[i].alpha = ball[i].alpha+random(PI-1,PI+1);
+					return false;
+				}
+			}
+			
+			// позицията е достъпна
+			return true;
+		}
+		
+		function drawFrame()
+		{
+			oldTime = time;
+			time = now();
+			var dT = time-oldTime;
+
+			// промяна на фоновия цвят
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([0,0,15],[0,0,0],[1,0,0]);
+
+			for (var i=0; i<m; i++)
+			{
+				ball[i].draw();
+
+				ball[i].alpha = ball[i].alpha+random(-0.3,0.3);
+				x = ball[i].center[0]+ball[i].speed*cos(ball[i].alpha);
+				y = ball[i].center[1]+ball[i].speed*sin(ball[i].alpha);
+
+				// ако (x,y) е свободно, местим топка i там
+				if ( ok(i,x,y) )
+					ball[i].center = [x,y,0];
+			}
+
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// добавяне на топка
+		function moreBalls()
+		{
+			if (m<n)
+			{
+				var x,y;
+				do	// пробвай случайни координати
+				{	// до намиране на празно място
+					x = random(-3.3,3.3);
+					y = random(-5.3,5.3);
+				}
+				while (!ok(m,x,y));
+				ball[m].color=[random(0,1),random(0,1),random(0,1)];
+				ball[m++].center=[x,y,0];
+			}
+		}
+		
+		// махане на топка
+		function lessBalls()
+		{
+			if (m>1) m--;
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>
+		<button onclick="moreBalls()">+1</button>
+		Lacinia purus, eu pretium justo
+		<button onclick="lessBalls()">-1</button>
+	</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

@@ -1,0 +1,196 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Ornare consectetur</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			background-color: SeaShell;
+		}
+
+		h3 {
+			display: inline;
+			color: Tomato;
+			padding: 0 0.3em;
+			border-left: solid 0.5em Tomato;
+			border-right: solid 0.5em Tomato;
+		}
+		
+		p {
+			margin-top: 0.3em;
+		}
+		
+		canvas {
+			display: block;
+			position: fixed;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+		}
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			// улавяме всички опити за промяна на размера
+			window.addEventListener('resize',resized,false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(1,1,1,0);
+
+			identity();
+
+			gl.uniform3f(uAmbientColor,0.2,0.2,0.2);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uSpecularColor,1,1,1);
+			gl.uniform1f(uShininess,5);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			SPHERE_SIDES = 24;
+			
+			// дефиниране на топките
+			n = 10;
+			ball = [];
+			var r = Math.min(gl.canvas.width,gl.canvas.height)/2-32;
+			var a = 2*PI/n;
+			for (var i=0; i<n; i++)
+			{
+				ball[i] = new Sphere([r*cos(a*i),r*sin(a*i),0],30);
+				ball[i].speed = 2;
+				ball[i].alpha = random(0,2*PI);
+			}
+			
+			resized();
+		}
+
+		var time=now(), oldTime=time;
+		function now() { return (new Date()).getTime()/1000; }
+		
+		// намира дали е възможно топка i да е на (x,y)
+		function ok(i,x,y)
+		{
+			// удар в стените
+			if (y-30<-gl.canvas.height/2 || y+30>gl.canvas.height/2 || x-30<-gl.canvas.width/2 || x+30>gl.canvas.width/2)
+			{
+				ball[i].color = [1,0,0];
+				ball[i].size = 10;
+				ball[i].alpha = ball[i].alpha+random(PI-1,PI+1);
+				return false;
+			}
+
+			// удар в друга топка
+			for (var j=0; j<n; j++) if (i!=j)
+			{
+				var dist = Math.pow(ball[j].center[0]-x,2)+Math.pow(ball[j].center[1]-y,2)
+				if (dist<60*60)
+				{
+					ball[i].color = [1,0,0];
+					ball[j].color = [1,0,0];
+					ball[i].size = 10;
+					ball[j].size = 10;
+					ball[i].alpha = ball[i].alpha+random(PI-1,PI+1);
+					return false;
+				}
+			}
+			
+			// позицията е достъпна
+			return true;
+		}
+		
+		function drawFrame()
+		{
+			time = now();
+
+			// промяна на фоновия цвят
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([0,0,15],[0,0,0],[0,1,0]);
+				
+			for (var i=0; i<n; i++)
+			{
+				ball[i].color[1] = 0.02+0.98*ball[i].color[1];
+				ball[i].size = 0.05*30+0.95*ball[i].size;
+				ball[i].draw();
+			
+				ball[i].speed = 3+2*sin(time+i);
+				ball[i].alpha = ball[i].alpha+random(-0.3,0.3);
+				x = ball[i].center[0]+ball[i].speed*cos(ball[i].alpha);
+				y = ball[i].center[1]+ball[i].speed*sin(ball[i].alpha);
+				ball[i].rot = [10*i*i+65*time,17*i*i+55*time,30*i*i-60*time,20*i*i-50*time];
+				
+				// ако (x,y) е свободно, местим топка i там
+				if ( ok(i,x,y) )
+					ball[i].center = [x,y,0];
+			}
+
+			requestAnimationFrame(drawFrame);
+		}
+
+		// размерът на екрана е променен
+		function resized()
+		{
+			// вземаме текущия адрес
+			gl.canvas.width = gl.canvas.offsetWidth;
+			gl.canvas.height = gl.canvas.offsetHeight;
+				
+			// подаваме го на WebGL
+			gl.viewport(0,0,gl.canvas.width,gl.canvas.height);
+				
+			// актуализираме проекцията
+			var proj = orthoMatrix(gl.canvas.width,gl.canvas.height,-1000,1000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+				
+			// предизвикваме прерисуване на сцената
+			requestAnimationFrame(drawFrame);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Dictum pharetra nam posuere</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+	
+	<h3>Morbi placerat et mi</h3>
+	<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras quis dui et libero maximus tempor. Donec faucibus, ante eu varius semper, tellus turpis eleifend risus, nec semper quam ante non risus. Duis volutpat rutrum massa, et tristique neque faucibus sit amet. Donec dictum dignissim tristique.</p>
+	
+	<h3>Lectus id dui tempor varius</h3>
+	<p>Phasellus blandit, mi nec pharetra euismod, est orci dignissim nunc, rutrum feugiat enim est id eros. Vestibulum at sapien interdum, egestas justo sed, suscipit tortor. Suspendisse imperdiet viverra feugiat. Aliquam lacinia ante sit amet eros vulputate pharetra. Duis at facilisis nisl. Morbi malesuada pellentesque pulvinar. Etiam viverra velit vitae viverra congue.</p>
+
+	<h3>Maecenas maximus</h3>
+	<p>Donec pellentesque, justo ornare consectetur egestas, eros purus sagittis nisi, vulputate convallis nisi leo nec est. Nunc at finibus ante, ac mattis nisl. Aenean bibendum lectus at lectus fermentum, non porttitor est accumsan. Pellentesque euismod fermentum nibh, non feugiat velit congue quis.</p>
+
+	<h3>Vehicula finibus</h3>
+	<p>Nunc pretium facilisis erat, vel eleifend tortor ultrices bibendum. Aliquam a nunc at ante tempor scelerisque non id elit. Phasellus ultricies varius ex hendrerit volutpat. Nam eu eros gravida, molestie mi at, porttitor augue. Donec accumsan vel sapien quis ornare.</p>
+
+	<h3>Vivamus ut lorem ligula</h3>
+	<p>Phasellus mi ipsum, finibus eu vestibulum at, tempus eget ligula. Nam congue tincidunt elit ac fringilla. Aliquam non lacus vitae augue elementum viverra. Duis et sem vel ligula iaculis molestie. Aliquam et suscipit mi. Fusce auctor odio lobortis orci hendrerit, vitae gravida dolor ullamcorper. Quisque ultrices mi ante, eu convallis dolor eleifend et. Vestibulum in elit pharetra, vestibulum ex nec, vestibulum lacus.</p>
+	
+	<h3>Class aptent taciti sociosqu</h3>
+	<p>Sed dignissim interdum tortor vitae fermentum. Nunc in urna sit amet ante imperdiet porttitor in non ligula. In vulputate orci tortor, nec vehicula est varius eget. Curabitur volutpat nibh eu purus fermentum elementum. Curabitur tempor in eros ut ornare. Donec consectetur mauris vel nisi dictum pharetra. Nam posuere dignissim erat, eget sollicitudin sem maximus nec.</p>
+</body>

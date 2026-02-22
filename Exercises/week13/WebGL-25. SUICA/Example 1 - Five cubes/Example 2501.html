@@ -1,0 +1,38 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Пет куба</title>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function main()
+		{
+			new Suica();
+			background([0.8,0.8,0.8]);
+			demo(15);
+			
+			a = cube([0,0,0],3);
+			a.color = [1,1,1];
+			
+			b1 = cube([0,3,0],2);
+			b1.color = [1,0,0.5];
+			
+			b2 = cube([0,-3,0],2);
+			b2.color = [1,0.8,0];
+			
+			b3 = cube([3,0,0],2);
+			b3.color = [0,1,0.5];
+			
+			b4 = cube([-3,0,0],2);
+			b4.color = [0,0.5,1];
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Пет куба</h2>
+	
+	<canvas width="600" height="400"></canvas>
+</body>

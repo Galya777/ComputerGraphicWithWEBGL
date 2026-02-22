@@ -1,0 +1,241 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Диаманти</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body   { text-align: center; }
+		canvas { border: solid 1px DarkSlateGray; }
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			document.body.addEventListener('keydown',keyDown,false);
+			document.body.addEventListener('keyup',keyUp,false);
+			
+			init();
+			drawFrame();
+		}
+		
+		function Wall(x,y,dx,dy,narrow)
+		{
+			var zone = 0.3;
+			var z = narrow?1.25:0;
+			var dz = narrow?0.5:2;
+			
+			var w = new Cuboid([x+dx/2,y+dy/2,z],[dx?dx:0.3,dy?dy:0.3,dz]);
+			w.color = [0.9,0.9,1];
+			
+			if (!narrow)
+			{
+				w.x1 = w.center[0]-w.size[0]/2-zone;
+				w.x2 = w.center[0]+w.size[0]/2+zone;
+				w.y1 = w.center[1]-w.size[1]/2-zone;
+				w.y2 = w.center[1]+w.size[1]/2+zone;
+			}
+			
+			return w;
+		}
+		
+		GEODESIC_SIDES = 0;
+		function labyrinth(x1,x2,y1,y2)
+		{
+			var dx = x2-x1;
+			var dy = y2-y1;
+			var m = Math.max(dx,dy);
+			var n = Math.min(dx,dy);
+			
+			if (m<=10)
+			{
+				diamonds.push( custom(new GeodesicSphere( [x1/2+x2/2,y1/2+y2/2,-0.2], 1/4 ),{
+					rot:[0,0,0],
+					color:[random(0.5,1.5),random(0.5,1.5),random(0.5,1.5)]
+				}) ); 
+				return;
+			}
+
+			m = 2*Math.round(random(3,m-3)/2);
+			n = 2*Math.round(random(2,n-4)/2);
+
+			if (dx>=dy)
+			{
+				wall.push( Wall(x1+m,y1,0,n+0.15) );
+				wall.push( Wall(x1+m,y1+n+2-0.15,0,dy-n-2+0.15) );
+				others.push( Wall(x1+m,y1,0,dy,true) );
+				labyrinth(x1,x1+m,y1,y2);
+				labyrinth(x1+m,x2,y1,y2);
+			}
+			else
+			{
+				wall.push( Wall(x1,y1+m,n+0.15,0) );
+				wall.push( Wall(x1+n+2-0.15,y1+m,dx-n-2+0.15,0) );
+				others.push( Wall(x1,y1+m,dx,0,true) );
+				labyrinth(x1,x2,y1,y1+m);
+				labyrinth(x1,x2,y1+m,y2);
+			}
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0,0,0,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,0.2,10000);
+			lookAt([40,40,85],[0,0,0],[0,0,1]);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.5,0.5,0.5);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			wall = []; // стени, които избягваме
+			others = []; // стени, които не избягваме
+			diamonds = []; // диаманти за събиране
+			
+			// стени на лабиринта
+			wall.push( Wall(-30,-20, 60, 0) );
+			wall.push( Wall(-30, 20, 60, 0) );
+			wall.push( Wall(-30,-20,  0,40) );
+			wall.push( Wall( 30,-20,  0,40) );
+			wall.push( Wall(-30,-20, 60, 0, true) );
+			wall.push( Wall(-30, 20, 60, 0, true) );
+			wall.push( Wall(-30,-20,  0,40, true) );
+			wall.push( Wall( 30,-20,  0,40, true) );
+
+			labyrinth(-30,30,-20,20);
+
+			requestAnimationFrame(drawFrame);
+		}
+
+		sin = Math.sin;
+		cos = Math.cos;
+		
+		pos = [5,5,0];
+		dir = 0;
+		dDir = 0;
+		dPos = 0;
+		kLeft = false;
+		kRight = false;
+		kForward = false;
+		
+		oldTime = now();
+		function drawFrame()
+		{
+			time = now();
+			dTime = time-oldTime;
+			oldTime = time;
+
+			if (kLeft) dDir = +1.5;
+			if (kRight) dDir = -1.5;
+			dir += dDir*dTime;
+			if (!kLeft && !kRight) dDir *= (1-5*dTime);
+		
+			
+			if (kForward) dPos = 4;
+			var newX = pos[0]+dPos*dTime*cos(dir);
+			var newY = pos[1]+dPos*dTime*sin(dir);
+			if (!kForward) dPos *= (1-5*dTime);
+			
+			// проверка за колизия със стена
+			for (var i=0; i<wall.length; i++)
+			{
+				// колизия по X
+				if (wall[i].x2>=newX && newX>=wall[i].x1 &&
+				    wall[i].y2>=pos[1] && pos[1]>=wall[i].y1)
+				{
+					newX = pos[0];
+					break;
+				}
+			}
+			for (var i=0; i<wall.length; i++)
+			{
+				// колизия по Y
+				if (wall[i].y2>=newY && newY>=wall[i].y1 &&
+				    wall[i].x2>=pos[0] && pos[0]>=wall[i].x1)
+				{
+					newY = pos[1];
+					break;
+				}
+			}
+			pos[0] = newX;
+			pos[1] = newY;
+			
+	
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt( 
+					[pos[0]-0.1*cos(dir),pos[1]-0.1*sin(dir),-0.3],
+					[pos[0]+10*cos(dir),pos[1]+10*sin(dir),-0.3],
+					[0,0,1] );
+					
+
+			for (var i=0; i<wall.length; i++)
+			{
+				wall[i].draw();
+			}
+			for (var i=0; i<others.length; i++)
+			{
+				others[i].draw();
+			}
+			for (var i=0; i<diamonds.length; i++)
+			{
+				diamonds[i].rot[0] += 100*sin(i+0.5)*dTime;
+				diamonds[i].rot[1] += 200*cos(i+1.5)*dTime;
+				diamonds[i].rot[2] += 300*sin(i-0.5)*dTime;
+				diamonds[i].draw();
+			}
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+	function keyDown(event)
+	{
+		// стрелка наляво
+		if (event.keyCode==37) kLeft = true, kRight = false;
+
+		// стрелка напред
+		if (event.keyCode==38) kForward = true;
+
+		// стрелка надясно
+		if (event.keyCode==39) kRight = true, kLeft = false;
+	}
+		
+	function keyUp(event)
+	{
+		// стрелка наляво
+		if (event.keyCode==37) kLeft = false;
+
+		// стрелка напред
+		if (event.keyCode==38) kForward = false;
+
+		// стрелка надясно
+		if (event.keyCode==39) kRight = false;
+	}
+	
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Диаманти</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

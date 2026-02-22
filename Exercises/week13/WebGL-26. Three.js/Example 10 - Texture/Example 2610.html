@@ -1,0 +1,55 @@
+﻿<html>
+	<head>
+        <meta charset=utf-8>
+		<title>Интерактивна къщичка</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+		<script src="three.min.js"></script>
+        <script src="orbit_controls.js"></script>
+		<script>
+			var scene = new THREE.Scene();
+			var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+
+			var renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+            renderer.setClearColor( 0xcccccc, 1 ); 
+			document.body.appendChild( renderer.domElement );
+            scene.add(camera);
+
+			var cube = new THREE.BoxGeometry( 5, 5, 5 );
+            var texture = THREE.ImageUtils.loadTexture('walls.png');
+            texture.anisotropy = renderer.getMaxAnisotropy(); // подобряване качеството на текстурата
+
+            var material = new THREE.MeshBasicMaterial({ map: texture });
+            var mesh = new THREE.Mesh(cube, material);
+            mesh.position.set(0, -1, 0);
+            scene.add(mesh);
+            
+            var roof = new THREE.CylinderGeometry( 0, 4, 4, 70 );
+            var texture2 = THREE.ImageUtils.loadTexture('roof.png');
+            texture2.anisotropy = renderer.getMaxAnisotropy();
+
+            var material2 = new THREE.MeshBasicMaterial({ map: texture2 });
+            var mesh2 = new THREE.Mesh(roof, material2);
+            mesh2.position.set(0, 3.5, 0);
+            scene.add(mesh2);
+            
+            controls = new THREE.OrbitControls(camera);
+            
+            camera.position.z = 10;
+            
+			var drawFrame = function () {
+				requestAnimationFrame( drawFrame );
+                controls.update();
+                camera.lookAt( scene.position );
+				renderer.render(scene, camera);
+			};
+                  
+			drawFrame();
+		</script>
+	</body>
+</html>

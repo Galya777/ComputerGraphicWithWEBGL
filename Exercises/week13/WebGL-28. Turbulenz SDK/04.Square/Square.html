@@ -1,0 +1,60 @@
+<html>
+<head>
+    <title>Square</title>
+    <script src="jslib/debug.js"></script>
+    <script src="jslib/webgl/turbulenzengine.js"></script>
+    <script src="jslib/webgl/graphicsdevice.js"></script>
+    <script src="jslib/draw2d.js"></script>
+</head>
+<body>
+    <canvas id="canvas" width="640px" height="480px"/>
+    <script>
+
+        TurbulenzEngine = WebGLTurbulenzEngine.create({
+            canvas: document.getElementById("canvas")
+        });
+
+        var graphicsDevice = TurbulenzEngine.createGraphicsDevice({});
+
+        var draw2D = Draw2D.create({
+            graphicsDevice: graphicsDevice
+        });
+		
+        var bgColor = [1.0, 1.0, 0.0, 1.0];
+
+
+
+        var sprite1 = Draw2DSprite.create({ //конструиране на спрайт
+            width: 100,						//големина на спрайта
+            height: 100,
+            x: graphicsDevice.width / 2,	//център на спрайта
+            y: graphicsDevice.height / 2,
+            color: [1.0, 1.0, 1.0, 1.0],
+            rotation: 0
+        });
+		
+		var PI = Math.PI; 
+        var accel = 0 ;
+		function update() {
+            accel +=PI / 120;				//скорост на движението
+			sprite1.rotation += Math.sin(accel) * 0.2; //промяна на ъгъла на завъртане на квадратчето
+			sprite1.rotation %=  PI * 2; //нулиране при 360 градуса
+			
+			if (graphicsDevice.beginFrame())
+            {
+                graphicsDevice.clear(bgColor, 1.0);
+                /* Rendering code goes here */
+
+                draw2D.begin();
+
+                draw2D.drawSprite(sprite1); //рисуване на квадратчето
+                draw2D.end();
+
+                graphicsDevice.endFrame();
+            }
+        }
+
+        TurbulenzEngine.setInterval(update, 1000 / 60);
+    </script>
+</body>
+</html>

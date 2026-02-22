@@ -1,0 +1,124 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Четене на пиксели</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			text-align: center;
+		}
+
+		canvas {
+			border: solid 0.5em Green;
+			cursor: crosshair;
+		}
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			// прехващане на мишката само над графичното поле
+			canvas.addEventListener('mousemove',mouseMove,false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.9,1,0.9,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.7,0.7,0.7);
+			gl.uniform3f(uDiffuseColor,0.9,0.9,0.9);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// графични обекти
+			n = 10;
+			tor = [];
+			for (var i=0; i<n; i++)
+			{
+				tor[i] = new Torus([random(-15,15),random(-15,15),random(-10,10)],3,1.5,0.5);
+				tor[i].rot = [random(0,360),random(0,360),random(0,360)];
+				tor[i].color = [random(0,1),random(0,1),random(0,1)];
+				tor[i].selectColor = [i/(n-1),0,1-i/(n-1)]; // плосък цвят на обекта
+			}
+		}
+
+		var selectMode = false;
+		
+		var oldTime = now();
+		var mouseX = 0;
+		var mouseY = 0;
+		
+		function drawFrame()
+		{
+			time = now();
+			dT = time-oldTime;
+			oldTime += dT;
+			
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([50*cos(time/11),50*sin(time/11),0],[0,0,0],[0,0,1]);
+
+			gl.uniform1i(uSelectMode,selectMode);
+			if (selectMode)
+				gl.clearColor(0,0,0,1);
+			else
+				gl.clearColor(0.9,1,0.9,1);
+			
+			for (var i=0; i<n; i++)
+			{
+				gl.uniform3fv(uSelectColor,tor[i].selectColor);
+				for (var j=0; j<4; j++) tor[i].rot[j] += 20*cos(j)*dT;
+				tor[i].draw();
+			}
+			
+			pixelValues = new Uint8Array(4);
+			gl.readPixels(mouseX, mouseY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixelValues);
+			document.getElementById('color').style.backgroundColor = 'rgb('+pixelValues[0]+','+pixelValues[1]+','+pixelValues[2]+')';
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// при движение на мишката се запомнят координатите
+		// спрямо координатна система с начало долния ляв
+		// пиксел на графичното поле
+		function mouseMove(event)
+		{
+			mouseX = getX(event)+Math.round(gl.canvas.width/2);
+			mouseY = getY(event)+Math.round(gl.canvas.height/2);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Четене на пиксели</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<button onclick="selectMode=false">Реални цветове</button>
+	<span id="color" style="display:inline-block; width: 10em; height: 3em; border: solid 1px black;">&nbsp;</span>
+	<button onclick="selectMode=true">Плоски цветове</button>
+</body>

@@ -1,0 +1,215 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Сложен пример</title>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function main()
+		{
+			console.log(Suica.version);
+			console.log(Suica.date);
+			document.getElementById('picasso').addEventListener("click", captureClick);
+			var contour = {color: [0,0,0], mode: Suica.LINE};
+
+			p = new Suica('picasso');
+			background([1,0.9,0.8]);
+			demo(4,1,0.3);
+
+			tex1 = new Suica.Image('iron.jpg');
+			
+			a1 = new Suica.Cube([0,0,0],1);
+			//a1.light = false;
+			a1.hollow = true;
+			a1.image = tex1;
+			a1.focus = [0,1,0];
+			a1.dir = 1;
+			a1.interactive = true;
+			
+			a1a = sameAs(a1).custom({
+				mode: Suica.POINT,
+				pointSize: 10,
+				image: tex1,
+				color: [1,1,1]});
+
+			py1 = pyramid([0,1,0],1,1,4).custom({
+				color: [1,1,0],
+				mode:Suica.SOLID,
+				focus: [1,0,-1]
+			});
+			py2 = sameAs(py1).custom(contour);
+
+			pr1 = prism([0,1,0],1,1/3,8).custom({
+				origin: [0,0,-1],
+				color: [1,1,0],
+				mode:Suica.SOLID,
+				focus: [-1,0,1]
+			});
+			pr2 = sameAs(pr1).custom(contour);
+			
+			sph = sphere([0,-1,0],0.5);
+			sphfr = sphere([0,-1,0.5],0.5).custom({mode:Suica.LINE,color:[0.8,0.4,0.6]});
+			
+			sph1 = spheroid([1,0,0],[1,0.3,0.3]);
+			sph2 = spheroid([1,0,0],[0.3,1,0.3]);
+			sph3 = spheroid([1,0,0],[0.3,0.3,1]);
+			
+			for(var i=0; i<100; i++)
+				point([random(-0.5,0.5),random(-0.5,0.5),random(-0.5,0.5)]).custom({pointSize:random(1,10),color:[random(0.7,1),random(0,0.3),random(0,0.3)]});
+		
+			b1 = ellipse([0,0,-1],[1/2,3]);
+			b1.image = new Suica.Image('box.jpg',[5,30]);
+			b1.light = false;
+			b1.focus = [1,0,0];
+			b1.spin = Math.PI/2;
+
+			a2 = new Suica.Cuboid([0,0.5,0],[0.5,1,0.1]);
+			a2.color = [1,0,0];
+			a2.origin = [0,-0.5,0];
+
+			a2a = sameAs(a2);
+			a2a.mode = Suica.LINE;
+			a2a.color = [0,0,0];
+			
+			ox = segment([0,0,0],[15,0,0]);
+			oy = segment([0,0,0],[0,15,0]);
+			oz = segment([0,0,0],[0,0,15]);
+			
+
+			new Suica('picasso2');
+			background([0.6,1,0.8]);
+			a3 = square([0,0,0],30);
+			a3.image = new Suica.Image('desert.jpg',2,[0,0.5]);;
+			sameAs(a3).custom(contour).custom({size:33});
+			
+			rectangle(a3.center,[36,43]).custom(contour);
+			rectangle(a3.center,[36,53]).custom(contour);
+			rectangle(a3.center,[36,63]).custom(contour);
+
+			cuboid([16,0,0],[10,20,30]);
+
+			aaa = cone([-15,0,5],20,30);
+			aaa.image = new Suica.Image('rock.jpg',[1,1]);
+			aaa.clipPlanes = [ [-1,0,0,0.35],[1,0,0,0.35], ];
+			aaa.hollow = true;
+			aaa2 = sameAs(aaa).custom({mode:Suica.LINE,color:[0,0,0]});
+			
+			bbb = cylinder([-15,0,5],20,10);
+			bbb.origin = [0,0,2];
+			bbb.image = new Suica.Image('rock.jpg',[1,1/4]);
+			bbb.hollow = true;
+			bbb2 = sameAs(bbb).custom({mode:Suica.LINE,color:[0,0,0]});
+			
+			ox2 = line([0,0,0],[15,0,0]).custom({origin:[0,0,-1]});
+			oy2 = line([0,0,0],[0,15,0]).custom({origin:[0,0,-1]});
+			oz2 = line([0,0,0],[0,0,15]).custom({origin:[0,0,-1]});
+
+			for (var i=3; i<6; i++)
+				polygon([0,0,15],10+3*i,i).custom({
+					mode: Suica.LINE,
+					color: [1,0,1],
+					spin: Math.PI/i});
+			circle([0,0,15],30).custom({
+					mode: Suica.LINE,
+					color: [1,0,1],
+					spin: Math.PI/i});;
+
+			for(var i=0; i<200; i++)
+				point([random(-30,30),random(-30,30),random(-30,30)]).custom({pointSize:random(1,10),color:[1,random(0.5,1),random(0,0.3)]});
+
+			gr = new Suica.Group([
+				cube([0,0,0],25).custom({color:[1,0,0.5],mode:Suica.POINT,pointSize:16}),
+				cube([12,0,0],10).custom({color:[0,1,0.5]}),
+				cube([-12,0,0],10).custom({color:[0,1,0.5]}),
+				cube([0,12,0],10).custom({color:[0,1,0.5]})]);
+			gr.add(cube([0,-12,0],10).custom({color:[0,1,0.5]}));
+			gr.add(cube([0,0,12],10).custom({color:[0,1,0.5]}));
+			gr.add(cube([0,0,-12],10).custom({color:[0,1,0.5]}));
+
+			gr1 = group([
+				gr.custom({center:[20,0,0]}),
+				sameAs(gr).custom({center:[-20,0,0]}),
+				sameAs(gr).custom({center:[0,20,0]}),
+				sameAs(gr).custom({center:[0,-20,0]}),
+			]);
+			gr1.sizes=[0.3,0.3,0.3];
+			p.nextFrame = bounce;
+			
+			demo(130-60,-1,1);
+		}
+
+
+		function bounce()
+		{
+			var time = Suica.time;
+			
+			sphfr.focus = [Math.cos(time),0,Math.sin(time)];
+			sphfr.spin = 2*time;
+			sphfr.radius = 0.5+0.1*Math.sin(6*time);
+			sph1.color = [0.5+0.5*Math.sin(time),0.5+0.5*Math.sin(time+2*Math.PI/3),0.5+0.5*Math.sin(time+4*Math.PI/3)];
+			sph2.color = [0.5+0.5*Math.sin(time+2*Math.PI/3),0.5+0.5*Math.sin(time+4*Math.PI/3),0.5+0.5*Math.sin(time+6*Math.PI/3)];
+			sph3.color = [0.5+0.5*Math.sin(time+4*Math.PI/3),0.5+0.5*Math.sin(time+6*Math.PI/3),0.5+0.5*Math.sin(time+8*Math.PI/3)];
+			a2.center[2] = 0.3*Math.sin(3*time);
+			a1.spin += a1.dir*Suica.dTime;
+			a1a.spin = a1.spin;
+			b1.spin = time/2;
+			aaa.focus = [Math.cos(time),2,Math.sin(time)];
+			bbb.focus = aaa.focus;
+			aaa.spin = time;
+			bbb.spin = time;
+			aaa2.focus = [Math.cos(time),2,Math.sin(time)];
+			bbb2.focus = aaa.focus;
+			aaa2.spin = time;
+			bbb2.spin = time;
+			gr1.center[1] = 30*Math.sin(time);
+			gr1.spin = -time;
+
+			var e = document.getElementById("label");
+			var pos = sphfr.getPosition();
+			e.style.left = pos[0]+"px";
+			e.style.top = pos[1]+"px";
+		}
+
+		function captureClick(e)
+		{
+			var rec = e.currentTarget.getBoundingClientRect();
+			var a = p.objectAtPoint(e.clientX,e.clientY);
+			if (a==a1) a1.dir=-a1.dir; 
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Сложен пример</h2>
+	
+	<div id="label" style="
+		position:absolute;
+		font-size: 1.5em;
+		font-family: 'Arial Black', Gadget, sans-serif;
+		font-weight: bold;
+		color: white;
+		-webkit-text-stroke: 1px blue;
+		background-color:transparent;
+		z-index:10;
+		top:0;
+		left:0;
+	">
+		Център<br>на сфера
+	</div>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="450" height="300" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	
+	<canvas id="picasso2" width="300" height="300" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+	<br>
+	<small>Кликни на черния куб, за да си смени посоката на въртене</small>
+</body>

@@ -1,0 +1,46 @@
+﻿<!DOCTYPE html>
+
+<!-- Ами това е началният код. Няма почти нищо в него, затова
+го напълнете с каквото счетете за подходящо. -->
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Графиката</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+
+	<style>
+		canvas {
+			display: block;
+			position: fixed;
+			left: 2em;
+			top: 2em;
+			margin: auto;
+			width: calc(100% - 4em);
+			height: calc(100% - 4em);
+			box-shadow: 0px 0px 6em DarkBlue;
+		}
+	</style>
+
+	<script>
+		function start( )
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+			drawFrame();
+		}
+		
+		function drawFrame()
+		{
+			gl.clearColor(0.5+sin(now()),0.5+sin(now()+2*PI/3),0.5+sin(now()+4*PI/3),1);
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			requestAnimationFrame(drawFrame);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<canvas id="picasso"></canvas>
+</body>

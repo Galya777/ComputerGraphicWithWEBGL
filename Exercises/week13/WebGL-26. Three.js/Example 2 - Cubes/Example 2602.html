@@ -1,0 +1,64 @@
+﻿<html>
+	<head>
+        <meta charset=utf-8>
+		<title>Кубове</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+		<script src="three.min.js"></script>
+		<script>
+			var scene = new THREE.Scene();
+			var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+			var renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+            renderer.setClearColor( 0xcccccc, 1 ); 
+			document.body.appendChild( renderer.domElement );
+            
+            var geometry = new THREE.BoxGeometry( 2, 2, 2 );
+            
+            //създаване на кубове
+			var cube = new THREE.Mesh( new THREE.BoxGeometry( 3, 3, 3 ), new THREE.MeshLambertMaterial( { color: 0xffffff } ) );
+            var cube2 = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: 0xff007b } ) );
+            var cube3 = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: 0xffcc00 } ) );
+            var cube4 = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: 0x00ff7b } ) );
+            var cube5 = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: 0x007bff } ));
+            var space = new THREE.Object3D(); // създаване на поле за кубовете
+            
+            //задаване на позиции на кубовете
+            cube.position.set( 0, 0, 0 );
+            cube2.position.set( -3, 0, 0 );
+            cube3.position.set( 3, 0, 0 );
+            cube4.position.set( 0, 0, -3 );
+            cube5.position.set( 0, 0, 3 );
+            
+            var cubes = [cube, cube2, cube3, cube4, cube5];
+            scene.add( space );
+            scene.add( camera );
+            for (i = 0;  i < cubes.length; i++)
+            {
+                space.add( cubes[i] );
+            }
+            
+            //задаване на светлина
+            var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+            scene.add( directionalLight );
+            directionalLight.position.set(0, 1, 1);
+            directionalLight.target = space;
+
+            camera.position.z = 7;
+            camera.position.y = 2;
+            
+			var drawFrame = function () {
+				requestAnimationFrame( drawFrame );
+                space.rotation.y += 0.02;
+                camera.lookAt( space.position );
+				renderer.render( scene, camera );
+			};
+
+			drawFrame();
+		</script>
+	</body>
+</html>

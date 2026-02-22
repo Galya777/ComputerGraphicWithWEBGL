@@ -1,0 +1,33 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Cras scelerisque</title>
+	
+	<script>
+		function newSelection()
+		{
+			// показване на избрания елемент при всеки нов
+			// избор на елемент в списъка
+			var v = document.getElementById('list').value;
+			document.getElementById('sel').innerHTML = v;
+		}
+	</script>
+</head>
+
+<body>
+	<h2>Cras scelerisque ipsum ac dapibus tristique</h2>
+	
+	<select id="list" onchange="newSelection()">
+		<option value="Morbi ipsum primis">Morbi</option>
+		<option value="Vel orci luctus">Vel</option>
+		<option value="Massa et ultrices">Massa</option>
+		<option value="Vehicula velit vel">Vehicula</option>
+		<option value="Finibus at purus">Finibus</option>
+		<option value="Libero nec lobortis">Libero</option>
+	</select>
+	
+	<p>
+		Maecenas nec lobortis leo [<span id="sel"></span>].
+	</p>
+</body>

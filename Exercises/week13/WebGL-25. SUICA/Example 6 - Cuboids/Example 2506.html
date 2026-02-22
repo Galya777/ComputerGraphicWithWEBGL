@@ -1,0 +1,40 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Паралелепипеди</title>
+
+	<style>
+		body	{ text-align: center; }
+		canvas	{ border: solid 1px; }
+	</style>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function main()
+		{
+			p = new Suica();
+			demo(70,1,0.4,-0.03);
+
+			a = cube([0,0,0], 20);
+			a.color = [1,0,0.5];
+			
+			cuboid([-14,0,0], [4,20,20]);
+			cuboid([+14,0,0], [4,20,20]);
+			cuboid([0,-14,0], [20,4,20]);
+			cuboid([0,+14,0], [20,4,20]);
+
+			a = cuboid([-14,-14,0], [4,4,20]); a.color = [1,1,0.5];
+			a = cuboid([-14,+14,0], [4,4,20]); a.color = [1,1,0.5];
+			a = cuboid([+14,-14,0], [4,4,20]); a.color = [1,1,0.5];
+			a = cuboid([+14,+14,0], [4,4,20]); a.color = [1,1,0.5];
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Паралелепипеди</h2>
+	
+	<canvas width="600" height="400"></canvas>
+</body>

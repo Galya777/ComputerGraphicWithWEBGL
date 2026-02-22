@@ -1,0 +1,62 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Плъзгане върху куб</title>
+
+	<style>
+		body	{ text-align: center; }
+		canvas	{ border: solid 1px; }
+	</style>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function main()
+		{
+			p = new Suica();
+			demo(120,1,0.3,-0.03);
+			
+			n = 60;
+			a = [];
+			for (var i=0; i<n; i++)
+			{
+				a[i] = sphere([0,0,0],1.2).custom({
+							color: [1,random(0.4,1),random(0.8,1)],
+							uSpeed: random(0.2,0.7),
+							vSpeed: random(0.2,0.7)
+						});
+			}
+			
+			cube([0,0,0],40);
+			
+			p.nextFrame = loop;
+		}
+		
+		sin = Math.sin;
+		cos = Math.cos;
+		max = Math.max;
+		abs = Math.abs;
+		
+		function loop()
+		{
+			t = Suica.time;
+			
+			for (var i=0; i<n; i++)
+			{
+				u = a[i].uSpeed*t+i;
+				v = a[i].vSpeed*t+i;
+				
+				p = [cos(u)*cos(v),sin(u)*cos(v),sin(v)];
+				d = max(abs(p[0]),abs(p[1]),abs(p[2]));
+				for (var j=0; j<3; j++) a[i].center[j] = 21*p[j]/d;
+			}
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Плъзгане върху куб</h2>
+	
+	<canvas width="600" height="400"></canvas>
+</body>

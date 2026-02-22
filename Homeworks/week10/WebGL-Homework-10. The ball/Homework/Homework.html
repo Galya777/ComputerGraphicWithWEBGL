@@ -1,0 +1,157 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Релефно земно кълбо</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<script>
+		var earth;
+		var elevImg;
+		
+		function start()
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',function(){init();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			// Canvas размери
+			var canvas = document.getElementById("picasso");
+			canvas.width = 800;
+			canvas.height = 600;
+			
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.6,0.7,0.9,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			gl.uniform1i(uSampler, 0);
+			gl.activeTexture(gl.TEXTURE0);
+
+			// Земята
+			earth = new Sphere([0,0,0],4);
+			earth.color = [1,1,1];
+			earth.texture = loadTexture('land_ocean_ice_2048.jpg');
+			
+			// Зареждаме elevation картинката
+			elevImg = new Image();
+			elevImg.onload = function() {
+				applyElevation();
+			};
+			elevImg.src = 'World-Elevation-Grey-Map.jpg';
+		}
+
+		
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+		
+		function drawFrame()
+		{
+			time = now();
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			lookAt([15, 10, 5], [0, 0, 0], [0, 0, 1]);
+			
+			earth.rot = [-90,23,0,-40*time];
+			earth.draw();
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// Прилагане на релефа
+		function applyElevation()
+		{
+			if (!elevImg) return;
+			
+			// Прочитаме elevation данните
+			var canvas = document.createElement('canvas');
+			canvas.width = elevImg.width;
+			canvas.height = elevImg.height;
+			var ctx = canvas.getContext('2d');
+			ctx.drawImage(elevImg, 0, 0);
+			var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+			
+			var width = canvas.width;
+			var height = canvas.height;
+			
+			// Вземаме буфера на сферата
+			var buffer = earth.buffer;
+			var n = earth.n;
+			
+			// Нови данни
+			var newData = [];
+			var newNormals = [];
+			
+			for (var i = 0; i <= n; i++)
+			{
+				for (var j = 0; j <= n; j++)
+				{
+					var idx = i * (n + 1) + j;
+					
+					var s = earth.st[idx * 2];
+					var t = earth.st[idx * 2 + 1];
+					
+					// Текстурна координата
+					var px = Math.floor(s * (width - 1));
+					var py = Math.floor((1 - t) * (height - 1));
+					var pixelIdx = (py * width + px) * 4;
+					
+					// Elevation (0-255)
+					var elevation = data[pixelIdx] / 255.0;
+					
+					// Релеф - повече за планините
+					var relief = elevation * 0.3;
+					
+					// Оригинален връх
+					var ox = earth.data[idx * 3];
+					var oy = earth.data[idx * 3 + 1];
+					var oz = earth.data[idx * 3 + 2];
+					
+					var len = Math.sqrt(ox*ox + oy*oy + oz*oz);
+					var nx = ox / len;
+					var ny = oy / len;
+					var nz = oz / len;
+					
+					// Нов радиус с релеф
+					var r = 4 + relief;
+					newData.push(nx * r, ny * r, nz * r);
+					newNormals.push(nx, ny, nz);
+				}
+			}
+			
+			// Обновяваме буфера
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(newData), gl.DYNAMIC_DRAW);
+		}
+	</script>	
+</head>
+
+<body onload="start()">
+	<h2>Релефно земно кълбо</h2>
+
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400" style="border: solid;">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

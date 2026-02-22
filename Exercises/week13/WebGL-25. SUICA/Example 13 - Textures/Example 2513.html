@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Текстури</title>
+
+	<style>
+		body	{ text-align: center; }
+		canvas	{ border: solid 1px; }
+	</style>
+
+	<script src="suica.min.js"></script>
+
+	<script>
+		function main()
+		{
+			new Suica();
+			background([0,0,0]);
+			demo();
+						
+			tex1 = new Suica.Image('box.jpg',1);
+			tex2 = new Suica.Image('box.jpg',2);
+			tex3 = new Suica.Image('box.jpg',[8,3]);
+			
+			cube([-25,0,0],20).custom({image:tex1});
+			cube([  0,0,0],20).custom({image:tex2});
+			cube([ 25,0,0],20).custom({image:tex3});
+		}
+	</script>	
+</head>
+
+<body onload="main()">
+	<h2>Текстури</h2>
+	
+	<canvas width="600" height="400"></canvas>
+</body>

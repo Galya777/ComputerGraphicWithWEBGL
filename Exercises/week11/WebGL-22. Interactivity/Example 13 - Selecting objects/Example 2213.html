@@ -1,0 +1,142 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Избор на обекти</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			text-align: center;
+		}
+
+		canvas {
+			border: solid 0.5em Green;
+			cursor: crosshair;
+		}
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			// прехващане на мишката само над графичното поле
+			canvas.addEventListener('mousemove',mouseMove,false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.9,1,0.9,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0,0,0);
+			gl.uniform3f(uDiffuseColor,1,1,1);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// обекти
+			n = 10;
+			tor = [];
+			for (var i=0; i<n; i++)
+			{
+				tor[i] = new Torus([random(-15,15),random(-15,15),random(-10,10)],3,1.5,0.5);
+				tor[i].rot = [random(0,360),random(0,360),random(0,360)];
+				tor[i].color = [1,1,1]; // реален цвят
+				tor[i].selectColor = [i/255,0,1]; // индекс, кодиран като плосък цвят
+			}
+		}
+
+		var selectMode = true;
+		var pixelValues = new Uint8Array(4*4);
+		
+		var oldTime = now();
+		var mouseX = 0;
+		var mouseY = 0;
+		
+		function drawFrame()
+		{
+			time = now();
+			dT = time-oldTime;
+			oldTime += dT;
+	
+			lookAt([50*cos(time/5),50*sin(time/5),0],[0,0,0],[0,0,1]);
+
+			// въртене на обектите
+			for (var i=0; i<n; i++)
+				for (var j=0; j<4; j++)
+					tor[i].rot[j] += 20*cos(j)*dT;
+
+			// режим на плосък цвят - изчистваме буфера
+			gl.uniform1i(uSelectMode,true);
+			gl.clearColor(0,0,0,1);
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			// рисуваме обектите
+			for (var i=0; i<n; i++)
+			{
+				gl.uniform3fv(uSelectColor,tor[i].selectColor);
+				tor[i].draw();
+			}
+			
+			// четем цветовете на 2х2 пиксела
+			gl.readPixels(mouseX, mouseY, 2, 2, gl.RGBA, gl.UNSIGNED_BYTE, pixelValues);
+			
+			// намираме кой обект е закодиран и в 4-те пиксела
+			var selected = -1;
+			if (pixelValues[0]==pixelValues[4] && pixelValues[0]==pixelValues[8] && pixelValues[0]==pixelValues[12] && pixelValues[2]==255)
+				selected = pixelValues[0];
+		
+			// нормален режим - изчистваме буфера от плоските цветове
+			gl.uniform1i(uSelectMode,false);
+			gl.clearColor(0,0,0,1);
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+			
+			// рисуваме обектите с истинските им цветове,
+			// като само избраният обект (ако го има) е червен
+			for (var i=0; i<n; i++)
+			{
+				if (i==selected) tor[i].color=[1,0,0];
+				tor[i].draw();
+				tor[i].color=[1,1,1];
+			}
+			
+			requestAnimationFrame(drawFrame);
+		}
+		
+		// при движение на мишката се запомнят координатите
+		// спрямо координатна система с начало долния ляв
+		// пиксел на графичното поле
+		function mouseMove(event)
+		{
+			mouseX = getX(event)+Math.round(gl.canvas.width/2);
+			mouseY = getY(event)+Math.round(gl.canvas.height/2);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Избор на обекти</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

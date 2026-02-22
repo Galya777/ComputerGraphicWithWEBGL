@@ -1,0 +1,226 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Геометрично чертане</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			text-align: center;
+		}
+
+		canvas {
+			border: solid 0.5em Green;
+			cursor: crosshair;
+		}
+		
+		#info {
+			position: absolute;
+			font-family: 'Arial Black';
+			font-size: 3em;
+			color: Indigo;
+		}
+	</style>
+	
+	<script>
+		// отсечка - конструктор с начална точка
+		Segment = function(x,y)
+		{	
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x,y,0,0,0,0]), gl.DYNAMIC_DRAW);
+			this.color = [0,0,0];
+			this.buf = buf;
+		}
+
+		// отсечка - задаване на крайна точка
+		Segment.prototype.end = function(x,y)
+		{	
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.bufferSubData(gl.ARRAY_BUFFER, 3*FLOATS,new Float32Array([x,y]));
+		}
+
+		// отсечка - метод за рисуване
+		Segment.prototype.draw = function()
+		{	
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			useMatrix();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+			gl.drawArrays(gl.LINES,0,2);
+			popMatrix();
+		}
+
+		// окръжност - конструктор с център и плътност
+		Circle = function(x,y,full)
+		{	
+			this.n = 64;
+			var data = [0,0,0];
+			for (var i=0; i<=this.n; i++)
+			{
+				var a = 2*PI*i/this.n;
+				data.push(cos(a),sin(a),0);
+			}
+			var buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+			this.color = [0,0,0];
+			this.buf = buf;
+			this.scale = [1,1,1];
+			this.center = [x,y,0];
+			this.full = full;
+		}
+
+		// окръжност - задаване на радиус
+		Circle.prototype.end = function(x,y)
+		{	
+			var r = Math.pow(Math.pow(this.center[0]-x,2)+Math.pow(this.center[1]-y,2),1/2);
+			this.scale = [r,r,r];
+		}
+
+		// окръжност - метод за рисуване
+		Circle.prototype.draw = function()
+		{	
+			pushMatrix();
+			gl.vertexAttrib3fv(aColor,this.color);
+			translate(this.center);
+			scale(this.scale);
+			useMatrix();
+			gl.bindBuffer(gl.ARRAY_BUFFER,this.buf);
+			gl.enableVertexAttribArray(aXYZ);
+			gl.vertexAttribPointer(aXYZ,3,gl.FLOAT,false,3*FLOATS,0*FLOATS);
+			if (this.full)
+				gl.drawArrays(gl.TRIANGLE_FAN,0,this.n+2);
+			else
+				gl.drawArrays(gl.LINE_STRIP,1,this.n+1);
+			popMatrix();
+		}
+
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			// прехващане на мишката само над графичното поле
+			canvas.addEventListener('mousemove',mouseMove,false);
+			canvas.addEventListener('mousedown',mouseDown,false);
+			canvas.addEventListener('mouseup',mouseUp,false);
+			
+			// изключване на контекстното меню
+			canvas.addEventListener('contextmenu',function(e){e.preventDefault();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.9,1,0.9,1);
+
+			identity();
+			var proj=orthoMatrix(gl.canvas.width,gl.canvas.height,-1000,1000);
+			gl.uniformMatrix4fv(uProjectionMatrix,false,proj);
+
+			elem = [];
+		}
+
+		// функция за удобство - връща X координата
+		function getX(event)
+		{
+			return event.clientX-gl.canvas.offsetLeft-gl.canvas.offsetWidth/2;
+		}
+		
+		// функция за удобство - връща Y координата
+		function getY(event)
+		{
+			return -event.clientY+gl.canvas.offsetTop+gl.canvas.offsetHeight/2;
+		}
+
+		
+		function drawFrame()
+		{
+			// промяна на фоновия цвят
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([0,0,500],[0,0,0],[0,1,0]);
+
+			for (var i=0; i<elem.length; i++)
+				elem[i].draw();
+			
+//			requestAnimationFrame(drawFrame);
+		}
+		
+
+		var draw = false;
+		
+		// при натискане на бутон
+		function mouseDown(event)
+		{
+			// игнорираме ново натискане докато рисуваме
+			if (draw) return;
+			if (event.button!=0 && event.button!=2) return
+			
+			elem.push(new Circle(getX(event),getY(event),true));
+			elem[elem.length-1].end(getX(event)+5,getY(event));
+
+			if (event.button==0)
+				elem.push(new Segment(getX(event),getY(event)));
+			if (event.button==2)
+				elem.push(new Circle(getX(event),getY(event),false));
+			
+			draw = true;
+			mouseMove(event);
+		}
+		
+		// при пускане на бутон (все едно кой)
+		function mouseUp(event)
+		{
+			// игнорираме пускане, ако не рисуваме
+			if (!draw) return;
+			
+			if (event.button==0)
+			{
+				elem.push(new Circle(getX(event),getY(event),true));
+				elem[elem.length-1].end(getX(event)+5,getY(event));
+				requestAnimationFrame(drawFrame);
+			}
+			
+			draw = false;
+		}
+		
+		// при движение на мишката
+		function mouseMove(event)
+		{
+			// игнорираме движение, ако не рисуваме
+			if (!draw) return;
+
+			if (event.button==0 || event.button==2)
+				elem[elem.length-1].end(getX(event),getY(event));
+				
+			requestAnimationFrame(drawFrame);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Геометрично чертане</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+</body>

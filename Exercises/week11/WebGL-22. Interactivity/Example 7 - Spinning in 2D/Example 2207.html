@@ -1,0 +1,167 @@
+﻿<!DOCTYPE html>
+
+<head>
+	<meta charset="utf-8"/>
+	<title>Въртене в 2D</title>
+
+	<script src="webgl-fmi.js"></script>
+	<script src="shaders.js"></script>
+	
+	<style>
+		body {
+			background-color: Black;
+			text-align: center;
+			color: White;
+		}
+
+		canvas {
+			border: solid 0.5em Indigo;
+		}
+	</style>
+	
+	<script>
+		function start( )
+		{
+			var	canvas = document.getElementById("picasso");
+			canvas.addEventListener('webglcontextlost',function(event){event.preventDefault();},false);
+			canvas.addEventListener('webglcontextrestored',init,false);
+			
+			// прехващане на мишката само над графичното поле
+			canvas.addEventListener('mousemove',mouseMove,false);
+			canvas.addEventListener('mousedown',mouseDown,false);
+			canvas.addEventListener('mouseup',mouseUp,false);
+			canvas.addEventListener('mouseout',mouseUp,false);
+			
+			// изключване на контекстното меню
+			canvas.addEventListener('contextmenu',function(e){e.preventDefault();},false);
+
+			init();
+			drawFrame();
+		}
+		
+		function init()
+		{
+			gl = getContext("picasso");
+			glprog = getProgram(vShader,fShader);
+			getVariables();
+
+			gl.enable(gl.DEPTH_TEST);
+			gl.clearColor(0.7,1.1,0.7,1);
+
+			identity();
+			perspective(30,gl.canvas.width/gl.canvas.height,1,40000);
+			gl.uniform1i(uUseNormalMatrix,false);
+
+			gl.uniform3f(uAmbientColor,0.3,0.3,0.3);
+			gl.uniform3f(uDiffuseColor,0.75,0.75,0.75);
+			gl.uniform3f(uLightDir,0,0,-1);
+
+			// използваме модул №0 за текстури
+			gl.uniform1i(uSampler, 0);
+			gl.activeTexture(gl.TEXTURE0);
+
+			plate = new Cube([0,0,-15000],30000);
+			plate.color = [1,1,1];
+			plate.texture = loadTexture('texture.jpg');
+			var m = texIdentity();
+			texScale(m,[50,50]);
+			plate.texMatrix = m;
+
+			requestAnimationFrame(drawFrame);
+		}
+
+		var time = now();
+		function now() { return (new Date()).getTime()/1000; }
+
+		// център на графичното поле
+		var viewX = 0;
+		var viewY = 0;
+		var viewS = 1;
+		var viewA = 0;
+
+		function drawFrame()
+		{
+			// промяна на фоновия цвят
+			gl.clear(gl.COLOR_BUFFER_BIT+gl.DEPTH_BUFFER_BIT);
+
+			lookAt([viewX,viewY,750*viewS],[viewX,viewY,0],[sin(viewA),cos(viewA),0]);
+
+			plate.draw();
+			
+			if (!gl.isTexture(plate.texture))
+				requestAnimationFrame(drawFrame);
+		}
+		
+
+		var drag = false;
+		
+		// при натискане на бутон
+		function mouseDown(event)
+		{
+			gl.canvas.style.cursor = 'move';
+			startX = getX(event);
+			startY = getY(event);
+			drag = true;
+		}
+		
+		// при пускане на бутон (все едно кой)
+		function mouseUp(event)
+		{
+			gl.canvas.style.cursor = 'default';
+			drag = false;
+		}
+		
+		// при движение на мишката
+		function mouseMove(event)
+		{
+			// игнорираме движение, ако не влачим
+			if (!drag) return;
+
+			var dX = startX-getX(event);
+			var dY = startY-getY(event);
+			
+			if (event.buttons==1)
+			{
+				// ляв бутон - плъзгане с отчитане на мащаба и ъгъла
+				viewX += viewS*(dY*sin(viewA)+dX*cos(viewA));
+				viewY += viewS*(dY*cos(viewA)-dX*sin(viewA));
+			}
+			else
+			{
+				// десен бутон - мащабиране с ограничение
+				if (2*Math.abs(dX)<Math.abs(dY))
+				{
+					// по-скоро вертикално движение - мащабиране с ограничение
+					gl.canvas.style.cursor = 'n-resize';
+					viewS = viewS*Math.pow(1.01,dY);
+					if (viewS>3) viewS=3;
+					if (viewS<1/3) viewS=1/3;
+				}
+				if (Math.abs(dX)>2*Math.abs(dY))
+				{
+					// по-скоро хоризонтално движение - въртене
+					gl.canvas.style.cursor = 'w-resize';
+					viewA += 0.005*dX*(getY(event)>0?1:-1);
+				}
+			}
+			
+			startX = getX(event);
+			startY = getY(event);
+			
+			requestAnimationFrame(drawFrame);
+		}
+	</script>
+</head>
+
+<body onload="start()">
+	<h2>Въртене в 2D</h2>
+	
+	<noscript>
+		Искаме JavaScript, но няма!
+	</noscript>
+	
+	<canvas id="picasso" width="600" height="400">
+		Искаме canvas, но няма!
+	</canvas>
+	<div><small><i>Плъзгане с ляв бутон (&#8596; и &#8597;), увеличаване с десен бутон (&#8597;), въртене с десен бутон (&#8596;).</i></small></div>
+</body>
